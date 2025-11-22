@@ -5,7 +5,9 @@
 #include <vector>
 #include <algorithm>
 #include <numeric>
+#include <limits>
 #include <sstream>
+#include <unordered_set>
 #include "H5Cpp.h"
 
 #include "TCanvas.h"
@@ -16,13 +18,20 @@
 #include "TF1.h"
 #include "TGraph.h"
 #include "TLegend.h"
-#include "TSpline.h"
+#include "TMatrixD.h"
+#include "TVectorD.h"
+#include "TDecompSVD.h"
 
 using namespace std;
 #define PI 3.14159
 
 double *extrapolate(vector<double> &, double, const double);
 vector<double> g(vector<float> &, vector<double> &, float, float &, float &);
+double BasisSplines(int, int, double, const vector<double> &);
+double EvaluateSpline(double, const vector<double> &, const vector<double> &, int);
+vector<double> ComputingCoeff(vector<double> &, vector<double> &, vector<double> &, int);
+vector<double> ConvolvedBraggModel(vector<double> &, vector<double> &, 
+vector<double> &, int, int);
 
 int main() {
     
@@ -66,7 +75,7 @@ int main() {
     outputfile << "Event" << "  " << "Slope" << "  " << "Intercept" << "  " << "Intersections" << endl;
 
     // Reading in the HDF5 File
-    int event = 18111; // Must change this at some point to read all events
+    int event = 17695; // Must change this at some point to read all events
     H5::H5File file(RunFileName, H5F_ACC_RDONLY);
 
     string datasetPath = "get/evt" + to_string(event) + "_data";
@@ -135,15 +144,17 @@ int main() {
         }
     }
     // Plotting the original data R vs Z
-    TGraph *gr = new TGraph(x_list.size(), z.data(), r_list.data());
-    gr->SetTitle("AT-TPC XY Projection;Z (mm);R (mm)");
-    gr->SetMarkerColor(kBlue);
-    gr->SetMarkerSize(4000.0);
-    gr->GetXaxis()->SetLimits(0.0, 1800.0);
-    gr->GetYaxis()->SetLimits(0.0, 275.0);
+    // TGraph *gr = new TGraph(x_list.size(), z.data(), r_list.data());
+    // gr->SetTitle("AT-TPC XY Projection;Z (mm);R (mm)");
+    // gr->SetMarkerColor(kBlue);
+    // gr->SetMarkerStyle(20);
+    // gr->SetMarkerSize(0.5);
+    // gr->GetXaxis()->SetLimits(0.0, 1800.0);
+    // gr->SetMinimum(0.0);
+    // gr->SetMaximum(275.0);
 
-    TCanvas *c1 = new TCanvas();
-    gr->Draw("AP");
+    // TCanvas *c1 = new TCanvas();
+    // gr->Draw("AP");
 
     // Here must use Hough Transform to isolate particle tracks and subsequently analyze them
     float theta_high, theta_low, theta_diff, theta_increment;
@@ -176,18 +187,19 @@ int main() {
             accumulator[rIndex][thetaIndex]++;
         }
     }
-    TH2D *h2 = new TH2D("h2", "Hough Space", thetabins, theta_low, theta_high, rbins, rhoMin, rhoMax);
-    for (int i = 0; i < rbins; i++) {
-        for (int j = 0; j < thetabins; j++) {
+    // Plotting 2D Histogram of Hough Transform
+    // TH2D *h2 = new TH2D("h2", "Hough Space", thetabins, theta_low, theta_high, rbins, rhoMin, rhoMax);
+    // for (int i = 0; i < rbins; i++) {
+    //     for (int j = 0; j < thetabins; j++) {
 
-            h2->SetBinContent(j, i, accumulator[i][j]);
-        }
-    }
-    h2->GetXaxis()->SetTitle("theta");
-    h2->GetYaxis()->SetTitle("rho");
+    //         h2->SetBinContent(j, i, accumulator[i][j]);
+    //     }
+    // }
+    // h2->GetXaxis()->SetTitle("theta");
+    // h2->GetYaxis()->SetTitle("rho");
 
-    TCanvas *c2 = new TCanvas();
-    h2->Draw("colz");
+    // TCanvas *c2 = new TCanvas();
+    // h2->Draw("colz");
 
     // Extracting the theta and r values that correspond to the highest voted cell
 
@@ -200,8 +212,8 @@ int main() {
                 float theta_peak = (theta_low + j*theta_increment) * PI / 180.0;
                 float slope = -cos(theta_peak) / sin(theta_peak);
                 float intercept = r_peak / sin(theta_peak);
-                float roundSlope = round(slope * 100.0) / 100.0;
-                float roundIntercept = round(intercept * 100.0) / 100.0;
+                float roundSlope = std::round(slope * 100.0) / 100.0;
+                float roundIntercept = std::round(intercept * 100.0) / 100.0;
 
                 outputfile << event << "  " << roundSlope << "  " << roundIntercept << "  " << accumulator[i][j] << endl;
             }
@@ -250,16 +262,17 @@ int main() {
     }
 
     // Plotting the Isolated Data
-    TGraph *gr1 = new TGraph(isolated_r.size(), isolated_z.data(), isolated_r.data());
-    gr1->SetTitle("Isolated Data;Z (mm);R (mm)");
-    gr1->SetMarkerColor(kBlue);
-    gr1->SetMarkerSize(4000.0);
-    gr1->GetXaxis()->SetLimits(0.0, 1800.0);
-    gr1->SetMinimum(0.0);
-    gr1->SetMaximum(275.0);
+    // TGraph *gr1 = new TGraph(isolated_r.size(), isolated_z.data(), isolated_r.data());
+    // gr1->SetTitle("Isolated Data;Z (mm);R (mm)");
+    // gr1->SetMarkerColor(kBlue);
+    // gr1->SetMarkerStyle(20);
+    // gr1->SetMarkerSize(0.5);
+    // gr1->GetXaxis()->SetLimits(0.0, 1800.0);
+    // gr1->SetMinimum(0.0);
+    // gr1->SetMaximum(275.0);
 
-    TCanvas *c3 = new TCanvas();
-    gr1->Draw("AP");
+    // TCanvas *c3 = new TCanvas();
+    // gr1->Draw("AP");
 
     float sigma_r[isolated_r.size()] = {0};
     for (int i = 0; i < isolated_r.size(); i++) {
@@ -288,11 +301,11 @@ int main() {
     double intercept_err = D / (B*D - A*A);
     double covar = -A / (B*D - A*A);
 
-    double max_z = (*max_element(isolated_r.begin(), isolated_r.end()) - track_intercept) / track_slope;
+    double max_z = (*std::max_element(isolated_r.begin(), isolated_r.end()) - track_intercept) / track_slope;
     double interceptZ = -track_intercept / track_slope;
 
     double adjacent = max_z - interceptZ;
-    double opposite = *max_element(isolated_r.begin(), isolated_r.end());
+    double opposite = *std::max_element(isolated_r.begin(), isolated_r.end());
     double LabAngle = atan2(opposite, adjacent) * 180.0/PI;
     double uncertaintyAngle = 1 / (1.0 + track_slope*track_slope) * sqrt(slope_err) * 180.0/PI;
 
@@ -369,15 +382,7 @@ int main() {
         reverseEnergyLoss.push_back(dEdx_Extension[i]);
     }
     delete [] dEdx_Extension;
-
-    // Plot of extrapolated Bragg Curve
-    // TGraph *gr3 = new TGraph(reverseEnergyLoss.size(), reverseAlphaDistance.data(), reverseEnergyLoss.data());
-    // gr3->SetTitle("11 MeV Bragg Curve Extrapolated; x (mm); dE/dx (MeV/mm)");
-    // gr3->SetMarkerColor(kBlue);
-    // gr3->SetMarkerSize(6000.0);
-
-    // TCanvas *c5 = new TCanvas();
-    // gr3->Draw("AP");
+    dEdx_Extension = nullptr;
     
     // Convolving the ADC Data
     vector<double> centers;
@@ -386,12 +391,12 @@ int main() {
     vector<float> tau_range;
     float step_size = 5.0; float idx = 0.0; float idx1 = 21.75;
 
-    while (idx < *max_element(isolated_r.begin(), isolated_r.end()) + 100.0) {
+    while (idx < *std::max_element(isolated_r.begin(), isolated_r.end()) + 100.0) {
         step_func_range.push_back(idx);
         idx += 0.1;
     }
 
-    while (idx1 < *max_element(step_func_range.begin(), step_func_range.end()) - 20.0) {
+    while (idx1 < *std::max_element(step_func_range.begin(), step_func_range.end()) - 20.0) {
         tau_range.push_back(idx1);
         idx1 += step_size;
     }
@@ -400,7 +405,7 @@ int main() {
 
         float g_start, g_end;
         vector<double> g_vector = g(step_func_range, isolated_Q, tau, g_start, g_end);
-        centers.push_back((g_start + g_end) / 2.0);
+        centers.push_back(round((g_start + g_end) * 1000.0 / 2.0) / 1000.0);
         
         float sum_charge = 0;
         for (int i = 0; i < isolated_r.size(); i++) {
@@ -411,26 +416,28 @@ int main() {
         convQsum.push_back(sum_charge);
     }
 
-    float SigmaR[centers.size()] = {5.0};
-    float SigmaQ[centers.size()] = {200.0};
+    vector<float> SigmaR(centers.size(), 5.0f);
+    vector<float> SigmaQ(centers.size(), 200.0f);
 
     // Plotting original ADC data and Convolved Data
-    // TCanvas *c6 = new TCanvas();
-    // c6->Divide(2, 1);
+    // TCanvas *c5 = new TCanvas();
+    // c5->Divide(2, 1);
     
-    // c6->cd(1);
+    // c5->cd(1);
     // TGraph *gr4 = new TGraph(isolated_r.size(), isolated_r.data(), isolated_Q.data());
     // gr4->SetTitle("ADC Data vs R; R (mm); Q (Arbitrary Units)");
     // gr4->SetMarkerColor(kRed);
-    // gr4->SetMarkerSize(7500.0);
+    // gr4->SetMarkerStyle(8);
+    // gr4->SetMarkerSize(1.0);
     // gr4->GetXaxis()->SetLimits(0, 300);
     // gr4->Draw("AP");
 
-    // c6->cd(2);
+    // c5->cd(2);
     // TGraph *gr5 = new TGraph(centers.size(), centers.data(), convQsum.data());
     // gr5->SetTitle("Convolved Data; R (mm); Q (Arbitrary Units)");
     // gr5->SetMarkerColor(kBlue);
-    // gr5->SetMarkerSize(7500.0);
+    // gr5->SetMarkerStyle(8);
+    // gr5->SetMarkerSize(1.0);
     // gr5->GetXaxis()->SetLimits(0, 300);
     // gr5->Draw("AP");
 
@@ -438,15 +445,191 @@ int main() {
     vector<double> AlphaX(reverseAlphaDistance);
 
     // Splining the Original Bragg Curve
-    vector<double> s_knots = {AlphaX[0], AlphaX[2], AlphaX[5], AlphaX[7], AlphaX[10], AlphaX[13], AlphaX[16], AlphaX[23], 
-    AlphaX[28], AlphaX[33], AlphaX[36], AlphaX[50], AlphaX[85], AlphaX[96], AlphaX[104], AlphaX[200], AlphaX.back()};
+    int splineDeg = 3;
+    vector<double> s_knots = {AlphaX[0], AlphaX[0], AlphaX[0], AlphaX[0], AlphaX[2], AlphaX[5], AlphaX[7], 
+        AlphaX[10], AlphaX[13], AlphaX[16], AlphaX[23], AlphaX[28], AlphaX[33], AlphaX[36], AlphaX[50], 
+        AlphaX[85], AlphaX[96], AlphaX[104], AlphaX[200], AlphaX.back(), AlphaX.back(), AlphaX.back(), AlphaX.back()};
 
     vector<double> splineCoeff = {1.72986300e-03,  1.79761991e-03,  2.02189255e-03,  2.35494371e-03, 
     2.97410001e-03,  3.47673751e-03,  4.27879205e-03,  5.15550036e-03, 
     6.40442249e-03,  8.30772500e-03,  9.06274315e-03,  7.81611792e-03, 
     4.52578335e-03,  1.53405384e-03, -2.41494076e-05,  2.15095570e-05, 
     -1.58384820e-05,  5.72638308e-06, -2.60945180e-06};
+
+    auto splineFunc = [&](double *x, double *) {
+        return EvaluateSpline(x[0], s_knots, splineCoeff, splineDeg);
+    };
+
+    double xmin = AlphaX.front(); double xmax = AlphaX.back();
+    TF1 *fSpline = new TF1("Spline", splineFunc, xmin, xmax, 0);
+
+    // Plot of extrapolated Bragg Curve
+    // fSpline->SetLineColor(kRed);
+    // fSpline->SetLineWidth(1);
+    // fSpline->SetNpx(1500);
     
+    // TGraph *gr3 = new TGraph(reverseEnergyLoss.size(), reverseAlphaDistance.data(), reverseEnergyLoss.data());
+    // gr3->SetTitle("11 MeV Bragg Curve Extrapolated; x (mm); dE/dx (MeV/mm)");
+    // gr3->SetMarkerColor(kBlue);
+    // gr3->SetMarkerSize(1.0);
+    // gr3->SetMarkerStyle(8);
+    // //gr3->GetXaxis()->SetLimits(3000, 3500);
+
+    // TCanvas *c6 = new TCanvas();
+    // gr3->Draw("AP");
+    // fSpline->Draw("L");
+
+    // TLegend *leg = new TLegend();
+    // leg->AddEntry(gr3, "Bragg Curve", "p");
+    // leg->AddEntry(fSpline, "Spline", "l");
+    // leg->Draw();
+
+    // Discretizing Bragg Curve for Convolution
+    vector<double> xDiscretization;
+    for (double x = 0.0; x <= *std::max_element(AlphaX.begin(), AlphaX.end()); x += 5.0) {xDiscretization.push_back(x);}
+        
+    vector<double> energyLossDiscret;
+    for (double x : xDiscretization) {energyLossDiscret.push_back(fSpline->Eval(x));}
+
+    // Convolving the Bragg Curve
+    vector<double> BraggCenters;
+    vector<double> ConvBraggSum;
+    vector<float> window_range;
+    vector<float> Bragg_tau_range;
+    float idxConv = 0.0; float idxConv1 = 0.0;
+
+    while (idxConv < *std::max_element(xDiscretization.begin(), xDiscretization.end()) + 100.0) {
+        window_range.push_back(idxConv);
+        idxConv += 0.1;
+    }
+
+    while (idxConv1 < *std::max_element(window_range.begin(), window_range.end()) - 20.0) {
+        Bragg_tau_range.push_back(idxConv1);
+        idxConv1 += step_size;
+    }
+
+    for (float tau : Bragg_tau_range) {
+
+        float BraggStart, BraggEnd;
+        vector<double> Bragg_g_vector = g(window_range, energyLossDiscret, tau, BraggStart, BraggEnd);
+        BraggCenters.push_back((BraggStart + BraggEnd) / 2.0);
+        
+        float BraggSum = 0;
+        for (int i = 0; i < xDiscretization.size(); i++) {
+            if (xDiscretization.at(i) >= BraggStart && xDiscretization.at(i) <= BraggEnd) {
+                BraggSum += energyLossDiscret.at(i);
+            }
+        }
+        ConvBraggSum.push_back(BraggSum);
+    }
+
+    // TGraph *gr6 = new TGraph(ConvBraggSum.size(), BraggCenters.data(), ConvBraggSum.data());
+    // gr6->SetMarkerColor(kRed);
+    // gr6->SetMarkerSize(1.0);
+    // gr6->SetMarkerStyle(8);
+
+    // TCanvas *c7 = new TCanvas();
+    // gr6->Draw("AP");
+
+    // Splining Convolved Bragg Curve
+    vector<double> s1_knots = {BraggCenters[0], BraggCenters[0], BraggCenters[0], BraggCenters[0], BraggCenters[175], 
+    BraggCenters[450], BraggCenters[580], BraggCenters[660], BraggCenters[711], BraggCenters[717], BraggCenters[723], 
+    BraggCenters[728], BraggCenters[735], BraggCenters[742], BraggCenters[748], BraggCenters[793], BraggCenters.back(), 
+    BraggCenters.back(), BraggCenters.back(), BraggCenters.back()};
+
+    vector<int> shiftRange; vector<int> scaleYRange;
+    for (int i = 3400; i < 3707; i++) {shiftRange.push_back(i);}
+    for (int i = 20000000; i < 22000000; i += 20000) {scaleYRange.push_back(i);}
+
+    vector<double> yData(convQsum);
+    vector<float> QError; QError.reserve(yData.size());
+            for (int i = 0; i < yData.size(); i++) {QError.push_back(SigmaQ[i]);}
+
+    vector<vector<double>> chiSquaredMatrix(shiftRange.size(), vector<double>(scaleYRange.size(), NAN));
+
+    for (int idxShift = 0; idxShift < shiftRange.size(); idxShift++) {
+        
+        vector<double> xTest;
+        vector<double> xModel;
+        vector<double> convolvedKnotsShift;
+
+        for (vector<double>::iterator it = BraggCenters.begin(); it != BraggCenters.end(); it++) {
+            xModel.push_back((*it - shiftRange[idxShift])*scaleFactor);
+        }
+
+        for (vector<double>::iterator it1 = s1_knots.begin(); it1 != s1_knots.end(); it1++) {
+            convolvedKnotsShift.push_back((*it1 - shiftRange[idxShift])*scaleFactor);
+        }
+
+        vector<double> CoeffAfterShift = ComputingCoeff(xModel, ConvBraggSum, convolvedKnotsShift, splineDeg);
+        vector<double> xData(centers);
+        
+        for (int idxScale = 0; idxScale < scaleYRange.size(); idxScale++) {
+
+            vector<double> yModel = ConvolvedBraggModel(xData, convolvedKnotsShift, CoeffAfterShift, 
+                scaleYRange[idxScale], splineDeg);
+
+            double chi2 = 0.0;
+            for (int k = 0; k < yData.size(); k++) {
+                
+                double diff = yData[k] - yModel[k];
+                chi2 += diff*diff / (QError[k]*QError[k]);
+            }
+            chiSquaredMatrix[idxShift][idxScale] = chi2;
+        }
+    }
+
+    // // Obtaining best shift and scale value from minimum chi-squared
+    double maxChi = std::numeric_limits<double>::infinity();
+    int shiftIdx = -1; int scaleIdx = -1;
+
+    for (int i = 0; i < chiSquaredMatrix.size(); i++) {
+        for (int j = 0; j < chiSquaredMatrix[i].size(); j++) {
+
+            double chiValue = chiSquaredMatrix[i][j];
+            if (!std::isnan(chiValue) && chiValue < maxChi) {
+
+                maxChi = chiValue;
+                shiftIdx = i;
+                scaleIdx = j;
+            }
+        }
+    }
+
+    int bestShift = shiftRange[shiftIdx]; int bestScale = scaleYRange[scaleIdx];
+
+    cout << "Chi Value: " << maxChi << endl;
+    cout << "Shift: " << bestShift << " Scale: " << bestScale << endl;
+
+    // Plotting Bragg Fit to Data
+    vector<double> xBraggPlot; vector<double> PlotKnots;
+    
+    for (vector<double>::iterator it = BraggCenters.begin(); it != BraggCenters.end(); it++) {
+        xBraggPlot.push_back((*it - bestShift)*scaleFactor);
+    }
+    for (vector<double>::iterator it = s1_knots.begin(); it != s1_knots.end(); it++) {
+        PlotKnots.push_back((*it - bestShift)*scaleFactor);
+    }
+
+    vector<double> CoeffForPlot = ComputingCoeff(xBraggPlot, ConvBraggSum, PlotKnots, splineDeg);
+    vector<double> yBraggPlot = ConvolvedBraggModel(xBraggPlot, PlotKnots, CoeffForPlot, bestScale, splineDeg);
+
+    TGraph *gr7 = new TGraph(xBraggPlot.size(), xBraggPlot.data(), yBraggPlot.data());
+    gr7->GetXaxis()->SetTitle("R (mm)");
+    gr7->GetYaxis()->SetTitle("Q (Arbitrary)");
+    gr7->GetXaxis()->SetLimits(0, 300);
+    gr7->SetLineStyle(10);
+    gr7->SetLineColor(2);
+    gr7->SetLineWidth(1);
+
+    TGraph *gr8 = new TGraph(convQsum.size(), centers.data(), convQsum.data());
+    gr8->SetMarkerStyle(20);
+    gr8->SetMarkerColor(kBlue);
+    gr8->SetMarkerSize(0.5);
+
+    TCanvas *c8 = new TCanvas();
+    gr7->Draw("AL");
+    gr8->Draw("P SAME");
 
     theApp.Run(); 
 
@@ -483,4 +666,74 @@ vector<double> g(vector<float> &t, vector<double> &Q, float tau, float &start_st
         }
     }
     return convolutionVector;
+}
+
+double BasisSplines(int i, int deg, double BraggPos, const vector<double> &knots) {
+
+    // Implementing Cox de Boor recursion
+    if (deg == 0) {
+        if (i == knots.size() - 2 && BraggPos == knots.back()) return 1.0;
+        return (BraggPos >= knots[i] && BraggPos < knots[i+1]) ? 1.0 : 0.0;
+    }
+
+    double denom1 = knots[i + deg] - knots[i];
+    double denom2 = knots[i + deg + 1] - knots[i + 1];
+    double inv1 = (denom1 != 0.0) ? 1.0 / denom1 : 0.0;
+    double inv2 = (denom2 != 0.0) ? 1.0 / denom2 : 0.0;
+    
+    double numerator1 = BraggPos - knots[i];
+    double numerator2 = knots[i + deg + 1] - BraggPos;
+
+    return numerator1 * inv1 * BasisSplines(i, deg - 1, BraggPos, knots) + 
+    numerator2 * inv2 * BasisSplines(i + 1, deg - 1, BraggPos, knots);
+}
+
+double EvaluateSpline(double BraggPos, const vector<double> &knots, const vector<double> &coeff, int deg) {
+
+    double sum = 0.0;
+    BraggPos = std::max(knots.front(), std::min(BraggPos, knots.back()));
+
+    int nBasis = knots.size() - deg - 1;
+    for (int i = 0; i < nBasis; i++) {sum += coeff.at(i) * BasisSplines(i, deg, BraggPos, knots);}
+
+    return sum;
+}
+
+vector<double> ComputingCoeff(vector<double> &xDisc, vector<double> &ELossDisc, vector<double> &knots, int deg) {
+    
+    // Constructing design matrix to compute coefficients (c): Ac = y
+    int NumBasis = knots.size() - deg - 1;
+    int NumData = xDisc.size();
+
+    TMatrixD DesignMtx(NumData, NumBasis);
+    for (int i = 0; i < NumData; i++) {
+        for (int j = 0; j < NumBasis; j++) {
+
+            DesignMtx(i, j) = BasisSplines(j, deg, xDisc[i], knots);
+        }
+    }
+
+    TVectorD y(NumData);
+    for (int i = 0; i < NumData; i++) {y(i) = ELossDisc[i];}
+
+    TDecompSVD svd(DesignMtx);
+    TVectorD Coeff(y);
+    Bool_t ok = svd.Solve(Coeff);
+
+    vector<double> Coefficients;
+    for (int i = 0; i < NumBasis; i++) {Coefficients.push_back(Coeff(i));}
+
+    return Coefficients;
+}
+
+vector<double> ConvolvedBraggModel(vector<double> &x,
+vector<double> &knots, vector<double> &SplineCoeff, int ParamScale, int deg) {
+
+    vector<double> evalSpline;
+    for (int i = 0; i < x.size(); i++) {
+        double evaluation = EvaluateSpline(x.at(i), knots, SplineCoeff, deg);
+        evalSpline.push_back(ParamScale*evaluation);
+    }
+
+    return evalSpline;
 }
