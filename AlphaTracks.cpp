@@ -225,12 +225,19 @@ int main() {
         return EvaluateSpline(x[0], EvsXKnots, EvXcoeff, splineDeg);
     };
 
-    for (int i = 10903; i < 10904; i++) {
+    for (int i = 12000; i < 12500; i++) {
         // Reading in the HDF5 File
-        int event = i; // Must change this at some point to read all events
+        int event = i; 
         H5::H5File file(H5FilePath, H5F_ACC_RDONLY);
 
         string datasetPath = "get/evt" + to_string(event) + "_data";
+
+        // Check to see if event number exists
+        if (!file.nameExists(datasetPath)) {
+            cerr << "WARNING: Dataset not found for event " << event << ". Skipping." << endl;
+            continue; 
+        }
+
         H5::DataSet dataset = file.openDataSet(datasetPath);
         H5::DataSpace dataspace = dataset.getSpace();
 
@@ -256,8 +263,6 @@ int main() {
         vector<double> x_list;
         vector<double> y_list;
         vector<double> r_list;
-
-        Q.clear(); z.clear(); x_list.clear(); y_list.clear(); r_list.clear();
 
         for (const auto& row : data) {
             vector<double> filtered_values;
@@ -403,8 +408,6 @@ int main() {
         vector<double> isolated_x;
         vector<double> isolated_y;
 
-        isolated_r.clear(); isolated_Q.clear(); isolated_z.clear(); isolated_x.clear(); isolated_y.clear();
-
         int max_intersections = -1;
         double best_slope = 0.0; double best_intercept = 0.0;
         istringstream iss;
@@ -459,9 +462,8 @@ int main() {
     // TCanvas *c3 = new TCanvas();
     // gr1->Draw("AP");
 
-        float sigma_r[isolated_r.size()] = {0};
+        vector<float> sigma_r(isolated_r.size(), 0.0f);
         for (int i = 0; i < isolated_r.size(); i++) {
-
             if (isolated_r[i] < 150) {sigma_r[i] = 2.5;}
             else {sigma_r[i] = 5.0;}
         }
@@ -519,9 +521,7 @@ int main() {
         vector<float> step_func_range;
         vector<float> tau_range;
 
-        centers.clear(); convQsum.clear(); step_func_range.clear(); tau_range.clear();
         float idx = 0.0; float idx1 = 21.75;
-
         while (idx < *std::max_element(isolated_r.begin(), isolated_r.end()) + 100.0) {
             step_func_range.push_back(idx);
             idx += 0.1;
