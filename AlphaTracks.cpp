@@ -225,7 +225,7 @@ int main() {
         return EvaluateSpline(x[0], EvsXKnots, EvXcoeff, splineDeg);
     };
 
-    for (int i = 12000; i < 12500; i++) {
+    for (int i = 12000; i < 12600; i++) {
         // Reading in the HDF5 File
         int event = i; 
         H5::H5File file(H5FilePath, H5F_ACC_RDONLY);
@@ -305,7 +305,7 @@ int main() {
 
         // Some events are empty, skip event
         if (r_list.empty()) {
-            Ni70_Results << event << " " << "No Data!" << endl;
+            Ni70_Results << event << " " << "Empty Event!" << endl;
             continue;
         }
     // Plotting the original data R vs Z
@@ -369,9 +369,8 @@ int main() {
     // h2->Draw("colz");
 
         // Extracting the theta and r values that correspond to the highest voted cell
-        ofstream outputfile("AlphaTracksHTResults.txt", ios::trunc);
         int threshold = 10;
-        bool conditionForTrack = true;
+        vector<double> slopesHT; vector<double> interceptHT; vector<int> intersectionsHT;
         for (int i = 0; i < rbins; i++) {
             for (int j = 0; j < thetabins; j++) {
 
@@ -385,21 +384,13 @@ int main() {
                     float roundIntercept = std::round(intercept * 100.0) / 100.0;
 
                     if (roundSlope > 0.0) {
-                        outputfile << event << "  " << roundSlope << "  " << roundIntercept << "  " << accumulator[i][j] << endl;
+                        slopesHT.push_back(roundSlope);
+                        interceptHT.push_back(roundIntercept);
+                        intersectionsHT.push_back(accumulator[i][j]);
                     } 
                 } 
             }
         }
-
-        outputfile.close();
-
-        string inputLine;
-        ifstream HTResults("AlphaTracksHTResults.txt");
-        getline(HTResults, inputLine); // Skip the first line
-
-        // Extracting data from the Hough Transform for analysis
-        double HTFileSlope, HTFileIntercepts, yValueHT, xValueHT;
-        int HTFileIntersections, HTFileEvent;
 
         // Vectors to store data from Hough Transform
         vector<double> isolated_r;
@@ -410,21 +401,16 @@ int main() {
 
         int max_intersections = -1;
         double best_slope = 0.0; double best_intercept = 0.0;
-        istringstream iss;
 
-        while (getline(HTResults, inputLine)) {
-            iss.clear();
-            iss.str(inputLine);
+        for (int i = 0; i < slopesHT.size(); i++) {
+            if (intersectionsHT[i] > max_intersections) {
 
-            if (iss >> HTFileEvent >> HTFileSlope >> HTFileIntercepts >> HTFileIntersections) {
-                if (HTFileIntersections > max_intersections) {
-
-                    max_intersections = HTFileIntersections;
-                    best_slope = HTFileSlope;
-                    best_intercept = HTFileIntercepts;
-                }
+                max_intersections = intersectionsHT[i];
+                best_slope = slopesHT[i];
+                best_intercept = interceptHT[i];
             }
         }
+        
 
         double slope = best_slope;
         double intercept = best_intercept;
@@ -447,6 +433,11 @@ int main() {
                 isolated_x.push_back(x_list[i]);
                 isolated_y.push_back(y_list[i]);
             }
+        }
+
+        if (isolated_r.empty()) {
+            Ni70_Results << event << " " << "No Track!" << endl;
+            continue;
         }
 
     // Plotting the Isolated Data
