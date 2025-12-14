@@ -386,11 +386,11 @@ int main() {
             }
         }
 
-        //outputfile.close();
+        outputfile.close();
 
         string inputLine;
         ifstream HTResults("AlphaTracksHTResults.txt");
-        // getline(HTResults, inputLine); // Skip the first line
+        getline(HTResults, inputLine); // Skip the first line
 
         // Extracting data from the Hough Transform for analysis
         double HTFileSlope, HTFileIntercepts, yValueHT, xValueHT;
@@ -407,13 +407,19 @@ int main() {
 
         int max_intersections = -1;
         double best_slope = 0.0; double best_intercept = 0.0;
+        istringstream iss;
 
-        while (HTResults >> HTFileEvent >> HTFileSlope >> HTFileIntercepts >> HTFileIntersections) {
-            if (HTFileIntersections > max_intersections) {
+        while (getline(HTResults, inputLine)) {
+            iss.clear();
+            iss.str(inputLine);
 
-                max_intersections = HTFileIntersections;
-                best_slope = HTFileSlope;
-                best_intercept = HTFileIntercepts;
+            if (iss >> HTFileEvent >> HTFileSlope >> HTFileIntercepts >> HTFileIntersections) {
+                if (HTFileIntersections > max_intersections) {
+
+                    max_intersections = HTFileIntersections;
+                    best_slope = HTFileSlope;
+                    best_intercept = HTFileIntercepts;
+                }
             }
         }
 
