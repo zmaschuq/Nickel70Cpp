@@ -77,7 +77,7 @@ int main() {
     // ofstream outputfile("AlphaTracksHTResults.txt", ios::trunc);
     // outputfile << "Event" << "  " << "Slope" << "  " << "Intercept" << "  " << "Intersections" << endl;
     ofstream Ni70_Results("70Ni_Results.txt", ios::app);
-    Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << endl;
+    Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << endl;
 
     // Reading in Energy Loss File
     ifstream SRIMEnergyLossFile("energy_loss_He_11MeV.txt");
@@ -225,7 +225,8 @@ int main() {
         return EvaluateSpline(x[0], EvsXKnots, EvXcoeff, splineDeg);
     };
 
-    for (int i = 12000; i < 12600; i++) {
+    //TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, -20000, 20000, 181, 0, 3);
+    for (int i = 12000; i < 12500; i++) {
         // Reading in the HDF5 File
         int event = i; 
         H5::H5File file(H5FilePath, H5F_ACC_RDONLY);
@@ -305,7 +306,7 @@ int main() {
 
         // Some events are empty, skip event
         if (r_list.empty()) {
-            Ni70_Results << event << " " << "Empty Event!" << endl;
+            Ni70_Results << event << " " << "No Track!" << endl;
             continue;
         }
     // Plotting the original data R vs Z
@@ -383,11 +384,11 @@ int main() {
                     float roundSlope = std::round(slope * 100.0) / 100.0;
                     float roundIntercept = std::round(intercept * 100.0) / 100.0;
 
-                    if (roundSlope > 0.0) {
-                        slopesHT.push_back(roundSlope);
-                        interceptHT.push_back(roundIntercept);
-                        intersectionsHT.push_back(accumulator[i][j]);
-                    } 
+                    //if (roundSlope > 0.0) {
+                    slopesHT.push_back(roundSlope);
+                    interceptHT.push_back(roundIntercept);
+                    intersectionsHT.push_back(accumulator[i][j]);
+                    //} 
                 } 
             }
         }
@@ -411,7 +412,7 @@ int main() {
             }
         }
         
-
+        double perpDist = 7.5;
         double slope = best_slope;
         double intercept = best_intercept;
 
@@ -426,7 +427,7 @@ int main() {
                 dist = fabs(r_i - slope * z_i - intercept) / sqrt(1 + slope*slope);
             }
 
-            if (dist < 15.0) {
+            if (dist < perpDist) {
                 isolated_r.push_back(r_i);
                 isolated_Q.push_back(Q[i]);
                 isolated_z.push_back(z_i);
@@ -435,6 +436,7 @@ int main() {
             }
         }
 
+        // Condition that does not meet definition of line (at least 10 points)
         if (isolated_r.empty()) {
             Ni70_Results << event << " " << "No Track!" << endl;
             continue;
@@ -668,14 +670,16 @@ int main() {
     // gr7->Draw("AL");
     // gr8->Draw("P SAME");
 
-    // Obtain Recoil Energy and Store in File
+        // Obtain Recoil Energy and Store in File
         double xRmin = xR_rev.front(); double xRmax = xR_rev.back();
         TF1 *EvXSpline = new TF1("Spline", EvXsplineFunc, xRmin, xRmax, 0);
 
         float EnergyofAlpha = EvXSpline->Eval(bestShift);
-        Ni70_Results << event << "  " << LabAngle << "  " << EnergyofAlpha << endl;
+        Ni70_Results << event << "  " << LabAngle << "  " << EnergyofAlpha << "  " << interceptZ << endl;
 
         delete EvXSpline;
+
+        //hEhT->Fill(interceptZ, EnergyofAlpha);
     
     // Plotting Splined Energy Curve
     // EvXSpline->SetLineColor(kRed);
@@ -693,7 +697,13 @@ int main() {
     // gr9->Draw("AP");
     // EvXSpline->Draw("L SAME");
     }
-    // theApp.run();
+
+    // hEhT->GetXaxis()->SetTitle("Lab Angle");
+    // hEhT->GetYaxis()->SetTitle("Recoil Energy");
+    // TCanvas *c10 = new TCanvas();
+    // hEhT->Draw();
+
+    // theApp.Run();
     return 0;
 }
 
