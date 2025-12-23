@@ -226,7 +226,7 @@ int main() {
     };
 
     //TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, -20000, 20000, 181, 0, 3);
-    for (int i = 12000; i < 12500; i++) {
+    for (int i = 15000; i < 16000; i++) {
         // Reading in the HDF5 File
         int event = i; 
         H5::H5File file(H5FilePath, H5F_ACC_RDONLY);
@@ -370,7 +370,7 @@ int main() {
     // h2->Draw("colz");
 
         // Extracting the theta and r values that correspond to the highest voted cell
-        int threshold = 10;
+        int threshold = 20;
         vector<double> slopesHT; vector<double> interceptHT; vector<int> intersectionsHT;
         for (int i = 0; i < rbins; i++) {
             for (int j = 0; j < thetabins; j++) {
@@ -436,7 +436,7 @@ int main() {
             }
         }
 
-        // Condition that does not meet definition of line (at least 10 points)
+        // Condition that does not meet definition of line (at least 20 points)
         if (isolated_r.empty()) {
             Ni70_Results << event << " " << "No Track!" << endl;
             continue;
