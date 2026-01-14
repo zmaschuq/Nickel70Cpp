@@ -77,7 +77,9 @@ int main() {
     // ofstream outputfile("AlphaTracksHTResults.txt", ios::trunc);
     // outputfile << "Event" << "  " << "Slope" << "  " << "Intercept" << "  " << "Intersections" << endl;
     ofstream Ni70_Results("70Ni_Results.txt", ios::app);
-    Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << endl;
+    // Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << endl;
+    Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << "  " << 
+    "Intersections" << endl;
 
     // Reading in Energy Loss File
     ifstream SRIMEnergyLossFile("energy_loss_He_11MeV.txt");
@@ -226,7 +228,7 @@ int main() {
     };
 
     //TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, -20000, 20000, 181, 0, 3);
-    for (int i = 15000; i < 16000; i++) {
+    for (int i = 107147; i < 108147; i++) {
         // Reading in the HDF5 File
         int event = i; 
         H5::H5File file(H5FilePath, H5F_ACC_RDONLY);
@@ -284,7 +286,7 @@ int main() {
             double adc = adc_max - mean_baseline;
             int tb_max = distance(traces.begin(), max_element(traces.begin(), traces.end()));
 
-            const double drift_vel = 11.59e+6;
+            const double drift_vel = 6.935e+6;
             const double frequency = 3.125e+6;
             double z_pos = drift_vel * tb_max / frequency;
 
@@ -370,7 +372,7 @@ int main() {
     // h2->Draw("colz");
 
         // Extracting the theta and r values that correspond to the highest voted cell
-        int threshold = 20;
+        int threshold = 10;
         vector<double> slopesHT; vector<double> interceptHT; vector<int> intersectionsHT;
         for (int i = 0; i < rbins; i++) {
             for (int j = 0; j < thetabins; j++) {
@@ -675,7 +677,9 @@ int main() {
         TF1 *EvXSpline = new TF1("Spline", EvXsplineFunc, xRmin, xRmax, 0);
 
         float EnergyofAlpha = EvXSpline->Eval(bestShift);
-        Ni70_Results << event << "  " << LabAngle << "  " << EnergyofAlpha << "  " << interceptZ << endl;
+        // Ni70_Results << event << "  " << LabAngle << "  " << EnergyofAlpha << "  " << interceptZ << endl;
+        Ni70_Results << event << "  " << LabAngle << "  " << EnergyofAlpha << "  " << interceptZ << "  " << 
+        max_intersections << endl;
 
         delete EvXSpline;
 
