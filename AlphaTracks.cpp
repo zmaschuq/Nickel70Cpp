@@ -35,9 +35,9 @@ const vector<double> &, int, int, double);
 
 int main() {
     
-    int argc = 0;
-    char *argv[] = {};
-    TApplication theApp("App", &argc, argv);
+    // int argc = 0;
+    // char *argv[] = {};
+    // TApplication theApp("App", &argc, argv);
     
     const int num_of_pads = 10240;
     vector<float> x_pad_mapping(num_of_pads, 0.0f);
@@ -80,6 +80,14 @@ int main() {
     // Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << endl;
     Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << "  " << 
     "Intersections" << endl;
+
+    ifstream S800EventResults("TrackEventsPID.txt");
+    int PIDEvents;
+    vector<int> EventsPID;
+
+    while (S800EventResults >> PIDEvents) {
+        EventsPID.push_back(PIDEvents);
+    }
 
     // Reading in Energy Loss File
     ifstream SRIMEnergyLossFile("energy_loss_He_11MeV.txt");
@@ -227,10 +235,10 @@ int main() {
         return EvaluateSpline(x[0], EvsXKnots, EvXcoeff, splineDeg);
     };
 
-    TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, 0, 180, 181, 0, 3);
-    for (int i = 12000; i < 13500; i++) {
+    //TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, 0, 180, 181, 0, 3);
+    for (int i = 0; i < EventsPID.size(); i++) {
         // Reading in the HDF5 File
-        int event = i; 
+        int event = EventsPID[i]; 
         H5::H5File file(H5FilePath, H5F_ACC_RDONLY);
 
         string datasetPath = "get/evt" + to_string(event) + "_data";
@@ -683,7 +691,7 @@ int main() {
 
         delete EvXSpline;
 
-        hEhT->Fill(LabAngle, EnergyofAlpha);
+        //hEhT->Fill(LabAngle, EnergyofAlpha);
     
     // Plotting Splined Energy Curve
     // EvXSpline->SetLineColor(kRed);
@@ -702,12 +710,12 @@ int main() {
     // EvXSpline->Draw("L SAME");
     }
 
-    hEhT->GetXaxis()->SetTitle("Lab Angle");
-    hEhT->GetYaxis()->SetTitle("Recoil Energy");
-    TCanvas *c10 = new TCanvas();
-    hEhT->Draw();
+    // hEhT->GetXaxis()->SetTitle("Lab Angle");
+    // hEhT->GetYaxis()->SetTitle("Recoil Energy");
+    // TCanvas *c10 = new TCanvas();
+    // hEhT->Draw();
 
-    theApp.Run();
+    // theApp.Run();
     return 0;
 }
 
