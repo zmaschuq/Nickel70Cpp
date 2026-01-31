@@ -35,9 +35,9 @@ const vector<double> &, int, int, double);
 
 int main() {
     
-    // int argc = 0;
-    // char *argv[] = {};
-    // TApplication theApp("App", &argc, argv);
+    int argc = 0;
+    char *argv[] = {};
+    TApplication theApp("App", &argc, argv);
     
     const int num_of_pads = 10240;
     vector<float> x_pad_mapping(num_of_pads, 0.0f);
@@ -235,7 +235,7 @@ int main() {
         return EvaluateSpline(x[0], EvsXKnots, EvXcoeff, splineDeg);
     };
 
-    //TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, 0, 180, 181, 0, 3);
+    TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, 0, 180, 181, 0, 3);
     for (int i = 0; i < EventsPID.size(); i++) {
         // Reading in the HDF5 File
         int event = EventsPID[i]; 
@@ -499,6 +499,16 @@ int main() {
         double LabAngle = atan2(opposite, adjacent) * 180.0/PI;
         double uncertaintyAngle = 1 / (1.0 + track_slope*track_slope) * sqrt(slope_err) * 180.0/PI;
 
+        // Conditions to exclude events where the vertex is not within active volume and angles too high
+        if (interceptZ < 0 || interceptZ > 1300) {
+            Ni70_Results << event << " " << "No Track!" << endl;
+            continue;
+        }
+        if (LabAngle <= 180 && LabAngle >= 175) {
+            Ni70_Results << event << " " << "No Track!" << endl;
+            continue;
+        }
+
     // TF1 *LSQFit = new TF1("LSQ Fit", "[0]*x + [1]", 0, 1900.0);
     // LSQFit->SetParameters(track_slope, track_intercept);
 
@@ -691,7 +701,7 @@ int main() {
 
         delete EvXSpline;
 
-        //hEhT->Fill(LabAngle, EnergyofAlpha);
+        hEhT->Fill(LabAngle, EnergyofAlpha);
     
     // Plotting Splined Energy Curve
     // EvXSpline->SetLineColor(kRed);
@@ -710,12 +720,12 @@ int main() {
     // EvXSpline->Draw("L SAME");
     }
 
-    // hEhT->GetXaxis()->SetTitle("Lab Angle");
-    // hEhT->GetYaxis()->SetTitle("Recoil Energy");
-    // TCanvas *c10 = new TCanvas();
-    // hEhT->Draw();
+    hEhT->GetXaxis()->SetTitle("Lab Angle");
+    hEhT->GetYaxis()->SetTitle("Recoil Energy");
+    TCanvas *c10 = new TCanvas();
+    hEhT->Draw();
 
-    // theApp.Run();
+    theApp.Run();
     return 0;
 }
 
