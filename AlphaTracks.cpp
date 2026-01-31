@@ -78,7 +78,7 @@ int main() {
     // outputfile << "Event" << "  " << "Slope" << "  " << "Intercept" << "  " << "Intersections" << endl;
     ofstream Ni70_Results("70Ni_Results.txt", ios::app);
     // Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << endl;
-    Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << "  " << 
+    Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << "  " << "  " << "Excitation" <<
     "Intersections" << endl;
 
     ifstream S800EventResults("TrackEventsPID.txt");
@@ -693,11 +693,26 @@ int main() {
         // Obtain Recoil Energy and Store in File
         double xRmin = xR_rev.front(); double xRmax = xR_rev.back();
         TF1 *EvXSpline = new TF1("Spline", EvXsplineFunc, xRmin, xRmax, 0);
-
         float EnergyofAlpha = EvXSpline->Eval(bestShift);
-        // Ni70_Results << event << "  " << LabAngle << "  " << EnergyofAlpha << "  " << interceptZ << endl;
-        Ni70_Results << event << "  " << LabAngle << "  " << EnergyofAlpha << "  " << interceptZ << "  " << 
-        max_intersections << endl;
+        
+        // Computing Excitation Energy of Nickel
+        const float constant = 931.5;
+        const int T2 = 4760;
+        float T3 = EnergyofAlpha;
+        float m1, m2, m3, m4;
+        float ExcitationEnergy;
+
+        m1 = 4.0022602 * constant; m1 = m3;
+        m2 = 69.93614 * constant;
+
+        float FirstTerm = m1 + m2 + T2 - m3 - T3;
+        float SecondTerm = sqrt(T2*T2 + 2*m2*T2) * sqrt(T3*T3 + 2*m3*T3)
+
+        m4 = (FirstTerm*FirstTerm - (T3*T3 + T2*T2) - 2*(m2*T2 + m3*T3) + 2*SecondTerm*cos(LabAngle * PI/180.0));
+        ExcitationEnergy = m4 - m2;
+
+        Ni70_Results << event << "  " << LabAngle << "  " << EnergyofAlpha << "  " << interceptZ << "  " << ExcitationEnergy <<
+        "  " << max_intersections << endl;
 
         delete EvXSpline;
 
