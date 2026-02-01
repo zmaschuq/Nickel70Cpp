@@ -13,6 +13,9 @@
 #include "TCanvas.h"
 #include "TGraph.h"
 #include "TH2D.h"
+#include "TH1I.h"
+#include "TH1F.h"
+#include "TH1D.h"
 #include "TApplication.h"
 #include "TMath.h"
 #include "TF1.h"
@@ -235,7 +238,8 @@ int main() {
         return EvaluateSpline(x[0], EvsXKnots, EvXcoeff, splineDeg);
     };
 
-    TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, 0, 180, 181, 0, 3);
+    //TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, 0, 180, 181, 0, 3);
+    TH1I *h1 = new TH1I("h1", "Excitation Spectrum", 51, 0, 25);
     for (int i = 0; i < EventsPID.size(); i++) {
         // Reading in the HDF5 File
         int event = EventsPID[i]; 
@@ -716,7 +720,8 @@ int main() {
 
         delete EvXSpline;
 
-        hEhT->Fill(LabAngle, EnergyofAlpha);
+        h1->Fill(ExcitationEnergy);
+        //hEhT->Fill(LabAngle, EnergyofAlpha);
     
     // Plotting Splined Energy Curve
     // EvXSpline->SetLineColor(kRed);
@@ -735,10 +740,15 @@ int main() {
     // EvXSpline->Draw("L SAME");
     }
 
-    hEhT->GetXaxis()->SetTitle("Lab Angle");
-    hEhT->GetYaxis()->SetTitle("Recoil Energy");
-    TCanvas *c10 = new TCanvas();
-    hEhT->Draw();
+    h1->GetXaxis()->SetTitle("Excitation Energy (MeV)");
+    h1->GetYaxis()->SetTitle("Counts");
+    TCanvas *c11 = new TCanvas();
+    h1->Draw();
+
+    // hEhT->GetXaxis()->SetTitle("Lab Angle");
+    // hEhT->GetYaxis()->SetTitle("Recoil Energy");
+    // TCanvas *c10 = new TCanvas();
+    // hEhT->Draw();
 
     theApp.Run();
     return 0;
