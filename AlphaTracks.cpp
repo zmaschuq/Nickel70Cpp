@@ -239,7 +239,7 @@ int main() {
     };
 
     //TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, 0, 180, 181, 0, 3);
-    TH1I *h1 = new TH1I("h1", "Excitation Spectrum", 51, 0, 25);
+    TH1D *h1 = new TH1D("h1", "Excitation Spectrum", 101, -50, 50);
     for (int i = 0; i < EventsPID.size(); i++) {
         // Reading in the HDF5 File
         int event = EventsPID[i]; 
@@ -504,11 +504,12 @@ int main() {
         double uncertaintyAngle = 1 / (1.0 + track_slope*track_slope) * sqrt(slope_err) * 180.0/PI;
 
         // Conditions to exclude events where the vertex is not within active volume and angles too high
-        if (interceptZ < 0 || interceptZ > 1300) {
+        if (interceptZ < 0.0 || interceptZ > 1300.0) {
             Ni70_Results << event << " " << "No Track!" << endl;
             continue;
         }
-        if (LabAngle <= 180 && LabAngle >= 175) {
+
+        if (LabAngle > 90.0) {
             Ni70_Results << event << " " << "No Track!" << endl;
             continue;
         }
@@ -702,18 +703,18 @@ int main() {
         // Computing Excitation Energy of Nickel
         const float constant = 931.5;
         const int T2 = 4760;
-        float T3 = EnergyofAlpha;
-        float m1, m2, m3, m4;
-        float ExcitationEnergy;
+        double T3 = EnergyofAlpha;
+        double m1, m2, m3, m4;
+        double ExcitationEnergy;
 
-        m1 = 4.0022602 * constant; m1 = m3;
+        m1 = 4.0022602 * constant; m3 = m1;
         m2 = 69.93614 * constant;
 
-        float FirstTerm = m1 + m2 + T2 - m3 - T3;
-        float SecondTerm = sqrt(T2*T2 + 2*m2*T2) * sqrt(T3*T3 + 2*m3*T3)
+        double FirstTerm = m1 + m2 + T2 - m3 - T3;
+        double SecondTerm = sqrt(T2*T2 + 2*m2*T2) * sqrt(T3*T3 + 2*m3*T3);
 
         m4 = (FirstTerm*FirstTerm - (T3*T3 + T2*T2) - 2*(m2*T2 + m3*T3) + 2*SecondTerm*cos(LabAngle * PI/180.0));
-        ExcitationEnergy = m4 - m2;
+        ExcitationEnergy = sqrt(m4) - m2;
 
         Ni70_Results << event << "  " << LabAngle << "  " << EnergyofAlpha << "  " << interceptZ << "  " << ExcitationEnergy <<
         "  " << max_intersections << endl;
