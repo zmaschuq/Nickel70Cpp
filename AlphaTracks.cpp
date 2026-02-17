@@ -386,7 +386,7 @@ int main() {
     // h2->Draw("colz");
 
         // Extracting the theta and r values that correspond to the highest voted cell
-        int threshold = 20;
+        int threshold = 10;
         vector<double> slopesHT; vector<double> interceptHT; vector<int> intersectionsHT;
         for (int i = 0; i < rbins; i++) {
             for (int j = 0; j < thetabins; j++) {
