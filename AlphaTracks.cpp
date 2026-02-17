@@ -79,10 +79,10 @@ int main() {
 
     // ofstream outputfile("AlphaTracksHTResults.txt", ios::trunc);
     // outputfile << "Event" << "  " << "Slope" << "  " << "Intercept" << "  " << "Intersections" << endl;
-    ofstream Ni70_Results("70Ni_Results.txt", ios::app);
-    // Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << endl;
-    Ni70_Results << "Event" << "  " << "Angle" << "  " << "Recoil Energy" << "  " << "Vertex" << "  " << "  " << "Excitation" <<
-    "Intersections" << endl;
+    
+    ofstream Ni70_Results("70Ni_Results.txt", ios::trunc);
+    Ni70_Results << "Event" << "  " << "Angle" << "  " << "Er" << "  " << "Vertex" << "  " << "  " << "Ex" <<
+    "  " << "ChiBragg" << "  " << "Intx" << "  " << "Scale" << "  " << "LSQChi" << endl;
 
     ifstream S800EventResults("TrackEventsPID.txt");
     int PIDEvents;
@@ -239,7 +239,9 @@ int main() {
     };
 
     //TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, 0, 180, 181, 0, 3);
-    TH1D *h1 = new TH1D("h1", "Excitation Spectrum", 101, -50, 50);
+    TH1D *h1 = new TH1D("h1", "Excitation Spectrum", 50, 0, 50);
+    // TH1D *hChi = new TH1D("hChi", "Chi-Squared (Normalized)", 2101, -100, 4000);
+
     for (int i = 0; i < EventsPID.size(); i++) {
         // Reading in the HDF5 File
         int event = EventsPID[i]; 
@@ -503,6 +505,19 @@ int main() {
         double LabAngle = atan2(opposite, adjacent) * 180.0/PI;
         double uncertaintyAngle = 1 / (1.0 + track_slope*track_slope) * sqrt(slope_err) * 180.0/PI;
 
+        double LSQChiVal = 0.0;
+        TF1 *LSQModel = new TF1("Model", "[0]*x + [1]", 0, 1900.0);
+        LSQModel->SetParameters(track_slope, track_intercept);
+
+        for (int i = 0; i < isolated_r.size(); i++) {
+            
+            double modelVal = LSQModel->Eval(isolated_z[i]);
+            double LSQDiff = isolated_r[i] - modelVal;
+
+            LSQChiVal += (LSQDiff*LSQDiff) / (sigma_r[i]*sigma_r[i]);
+        }
+        double reducedLSQChi = LSQChiVal / (isolated_r.size() - 2);
+
         // Conditions to exclude events where the vertex is not within active volume and angles too high
         if (interceptZ < 0.0 || interceptZ > 1300.0) {
             Ni70_Results << event << " " << "No Track!" << endl;
@@ -669,7 +684,14 @@ int main() {
             }
         }
 
+        double maxChi_norm = maxChi / convQsum.size();
+        if (maxChi_norm > 1.5 || maxChi_norm < 0.90) {
+            Ni70_Results << event << " " << "Bad Chi Squared!" << endl;
+            continue;
+        }
+
         int bestShift = shiftRange[shiftIdx]; int bestScale = scaleYRange[scaleIdx];
+        // hChi->Fill(maxChi_norm);
 
         // cout << "Chi Value: " << maxChi << endl;
         // cout << "Shift: " << bestShift << " Scale: " << bestScale << endl;
@@ -717,7 +739,8 @@ int main() {
         ExcitationEnergy = sqrt(m4) - m2;
 
         Ni70_Results << event << "  " << LabAngle << "  " << EnergyofAlpha << "  " << interceptZ << "  " << ExcitationEnergy <<
-        "  " << max_intersections << endl;
+        "  " << "  " << maxChi_norm << "  " << max_intersections << "  " << bestScale << 
+        "  " << reducedLSQChi << endl;
 
         delete EvXSpline;
 
@@ -745,6 +768,11 @@ int main() {
     h1->GetYaxis()->SetTitle("Counts");
     TCanvas *c11 = new TCanvas();
     h1->Draw();
+
+    // hChi->GetXaxis()->SetTitle("Chi Squared");
+    // hChi->GetYaxis()->SetTitle("Counts");
+    // TCanvas *c12 = new TCanvas();
+    // hChi->Draw();
 
     // hEhT->GetXaxis()->SetTitle("Lab Angle");
     // hEhT->GetYaxis()->SetTitle("Recoil Energy");
