@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
 
     ofstream S800Event("TrackEventsPID.txt", ios::trunc);
 
-    TH2D *h2 = new TH2D("h2", "70Ni PID;TOF;Energy Loss", 1000, -2000, 2000, 1000, 0, 4000);
+    TH2D *h2 = new TH2D("h2", "70Ni PID: ftac_obj & fMultiHitTOF.fRf;TOF;Energy Loss", 1000, -2000, 2000, 1000, 0, 4000);
     
     string root_path = "/groups/tahn1/data/70Ni_NSCL/rootS800/cal/run-2020-00.root";
     string h5_path = "/groups/tahn1/data/70Ni_NSCL/h5/run_0020.h5";
@@ -36,8 +36,8 @@ int main(int argc, char** argv) {
 
     TLeaf *S800TS = tree->GetLeaf("fts");
     TLeaf *TotalDE = tree->GetLeaf("fIC.fsum");
-    TLeaf *tacObj = tree->GetLeaf("fTOF.ftac_obj");
-    TLeaf *multihit_rf = tree->GetLeaf("fMultiHitTOF.fRf");
+    TLeaf *tacObj = tree->GetLeaf("fMultiHitTOF.fRf");
+    TLeaf *MHfRf = tree->GetLeaf("fTOF.ftac_obj");
 
     map<long long, S800Data> s800_map;
     int numEntries = tree->GetEntries();
@@ -46,14 +46,14 @@ int main(int argc, char** argv) {
         tree->GetEntry(i);
         
         // Check to see if leaf exists, if it does get the value
-        double MH_rf_val = (multihit_rf && multihit_rf->GetLen() > 0) ? multihit_rf->GetValue(0) : 0;
+        double Rf_val = (MHfRf) ? MHfRf->GetValue() : 0;
         double de_val  = (TotalDE) ? TotalDE->GetValue() : 0;
-        double tacObj_val = (tacObj) ? tacObj->GetValue(0) : 0;
+        double tacObj_val = (tacObj && tacObj->GetLen() > 0) ? tacObj->GetValue(0) : 0;
 
-        if (tacObj_val != 0 && MH_rf_val != 0 && de_val > 500) {
+        if (tacObj_val != 0 && Rf_val != 0 && de_val > 500) {
             S800Data data;
             data.de = de_val;
-            data.tof_corr = -MH_rf_val + tacObj_val; 
+            data.tof_corr = Rf_val - tacObj_val; 
             
             s800_map[(long long)S800TS->GetValue()] = data;
         }
@@ -63,37 +63,60 @@ int main(int argc, char** argv) {
     H5::Group getGroup = file.openGroup("/get");
     
     long long ts_offset = -1492; 
+    long long ts_offset1 = -1493;
     int match_count = 0;
+    int match_count1 = 0;
 
     TCutG *gate = new TCutG("gate1", 5);
+    // gate->SetPoint(0, 675, 1875);
+    // gate->SetPoint(1, 620, 1975);
+    // gate->SetPoint(2, 620, 2150);
+    // gate->SetPoint(3, 675, 2150);
+    // gate->SetPoint(4, 675, 1875);
+
+    // gate->SetPoint(0, 675, 1750);
+    // gate->SetPoint(1, 675, 2150);
+    // gate->SetPoint(2, 740, 2150);
+    // gate->SetPoint(3, 740, 1750);
+    // gate->SetPoint(4, 675, 1750);
+
     gate->SetPoint(0, 675, 1750);
     gate->SetPoint(1, 675, 2150);
-    gate->SetPoint(2, 740, 2150);
-    gate->SetPoint(3, 740, 1750);
+    gate->SetPoint(2, 620, 2150);
+    gate->SetPoint(3, 620, 1750);
     gate->SetPoint(4, 675, 1750);
 
-    for (int i = 10759; i <= 32028; i++) {
+    for (int i = 1056688; i <= 1113266; i++) {
         // Try-catch statement in the case event doesn't exist
         try {
             H5::DataSet dataset = getGroup.openDataSet("evt" + to_string(i) + "_header");
             vector<long long> hb(3);
             dataset.read(hb.data(), H5::PredType::NATIVE_LLONG);
             long long corrected_ts = hb[2] + ts_offset;
+            long long corrected_ts1 = hb[2] + ts_offset1;
 
             if (s800_map.count(corrected_ts)) {
                 
                 h2->Fill(s800_map[corrected_ts].tof_corr, s800_map[corrected_ts].de);
                 if (gate->IsInside(s800_map[corrected_ts].tof_corr, s800_map[corrected_ts].de)) {
-
                     S800Event << i << endl;
                 }
-
                 match_count++;
             }
+            else if (s800_map.count(corrected_ts1)) {
+
+                h2->Fill(s800_map[corrected_ts1].tof_corr, s800_map[corrected_ts1].de);
+                if (gate->IsInside(s800_map[corrected_ts1].tof_corr, s800_map[corrected_ts1].de)) {
+                    S800Event << i << endl;
+                }
+                match_count1++;
+            }
+
         } catch (...) { continue; }
     }
 
-    cout << "Matches Plotted: " << match_count << endl;
+    cout << "Matches Plotted for 1492: " << match_count << endl;
+    cout << "Matches Plotted for 1493: " << match_count1 << endl;
 
     TCanvas *c1 = new TCanvas("c1", "70Ni PID - Corrected", 1000, 800);
     c1->SetLogz(); 
