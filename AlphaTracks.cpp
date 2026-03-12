@@ -322,7 +322,7 @@ int main() {
 
         // Some events are empty, skip event
         if (r_list.empty()) {
-            Ni70_Results << event << " " << "No Track!" << endl;
+            Ni70_Results << event << " " << "No Data!" << endl;
             continue;
         }
     // Plotting the original data R vs Z
@@ -340,7 +340,7 @@ int main() {
 
         // Here must use Hough Transform to isolate particle tracks and subsequently analyze them
         float theta_high = 90.0; float theta_low = -90.0; float theta_increment = 0.5;
-        float r_increment = 2.5;
+        float r_increment = 2.0;
         float theta_diff;
     
         // cout << "Input lowest theta value, highest, and increment (DEGREES/FLOATS): " << endl;
@@ -352,7 +352,7 @@ int main() {
         int thetabins = round(theta_diff/theta_increment) + 1.0;
 
         const float AT_TPC_Radius = 275.0;
-        const float AT_TPC_Length = 1900.0;
+        const float AT_TPC_Length = 1400.0;
         const float rhoBounds = sqrt(AT_TPC_Radius*AT_TPC_Radius + AT_TPC_Length*AT_TPC_Length);
         const float rhoMin = -rhoBounds, rhoMax = rhoBounds, rhoRange = rhoMax - rhoMin;
         int rbins = round(rhoRange/r_increment) + 1.0;
@@ -452,7 +452,7 @@ int main() {
             }
         }
 
-        // Condition that does not meet definition of line (at least 20 points)
+        // Condition that does not meet definition of line (at least 10 points)
         if (isolated_r.empty()) {
             Ni70_Results << event << " " << "No Track!" << endl;
             continue;
@@ -642,14 +642,15 @@ int main() {
         shiftRange.clear(); scaleYRange.clear();
 
         for (int i = 3400; i < 3707; i++) {shiftRange.push_back(i);}
-        for (int i = 100000; i < 500000; i += 10000) {scaleYRange.push_back(i);}
+        for (int i = 400000; i < 600000; i += 10000) {scaleYRange.push_back(i);}
 
         vector<double> yData(convQsum);
         vector<float> QError; QError.reserve(yData.size());
                 for (int i = 0; i < yData.size(); i++) {QError.push_back(SigmaQ[i]);}
 
         vector<vector<double>> chiSquaredMatrix(shiftRange.size(), vector<double>(scaleYRange.size(), NAN));
-
+        
+        double QThreshold = 500.0;
         for (int idxShift = 0; idxShift < shiftRange.size(); idxShift++) {
             
             vector<double> yModel = ConvolvedBraggModel(xData, s1_knots, CoeffConvolvedBragg, 
@@ -659,9 +660,10 @@ int main() {
 
                 double chi2 = 0.0;
                 for (int k = 0; k < yData.size(); k++) {
-                    
-                    double diff = yData[k] - yModel[k]*scaleYRange[idxScale];
-                    chi2 += diff*diff / (QError[k]*QError[k]);
+                    if (yData[k] > QThreshold) {
+                        double diff = yData[k] - yModel[k]*scaleYRange[idxScale];
+                        chi2 += diff*diff / (QError[k]*QError[k]);
+                    }
                 }
                 chiSquaredMatrix[idxShift][idxScale] = chi2;
             }
@@ -684,13 +686,14 @@ int main() {
             }
         }
 
+        int bestShift = shiftRange[shiftIdx]; int bestScale = scaleYRange[scaleIdx];
+
         double maxChi_norm = maxChi / convQsum.size();
-        if (maxChi_norm > 1.5 || maxChi_norm < 0.90) {
+        if (maxChi_norm > 5.0 || maxChi_norm < 0.30) {
             Ni70_Results << event << " " << "Bad Chi Squared!" << endl;
             continue;
         }
 
-        int bestShift = shiftRange[shiftIdx]; int bestScale = scaleYRange[scaleIdx];
         // hChi->Fill(maxChi_norm);
 
         // cout << "Chi Value: " << maxChi << endl;
