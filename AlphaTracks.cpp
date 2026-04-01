@@ -325,18 +325,6 @@ int main() {
             Ni70_Results << event << " " << "No Data!" << endl;
             continue;
         }
-    // Plotting the original data R vs Z
-    // TGraph *gr = new TGraph(x_list.size(), z.data(), r_list.data());
-    // gr->SetTitle("AT-TPC XY Projection;Z (mm);R (mm)");
-    // gr->SetMarkerColor(kBlue);
-    // gr->SetMarkerStyle(20);
-    // gr->SetMarkerSize(0.5);
-    // gr->GetXaxis()->SetLimits(0.0, 1800.0);
-    // gr->SetMinimum(0.0);
-    // gr->SetMaximum(275.0);
-
-    // TCanvas *c1 = new TCanvas();
-    // gr->Draw("AP");
 
         // Here must use Hough Transform to isolate particle tracks and subsequently analyze them
         float theta_high = 90.0; float theta_low = -90.0; float theta_increment = 0.5;
@@ -371,19 +359,6 @@ int main() {
                 accumulator[rIndex][thetaIndex]++;
             }
         }
-    // Plotting 2D Histogram of Hough Transform
-    // TH2D *h2 = new TH2D("h2", "Hough Space", thetabins, theta_low, theta_high, rbins, rhoMin, rhoMax);
-    // for (int i = 0; i < rbins; i++) {
-    //     for (int j = 0; j < thetabins; j++) {
-
-    //         h2->SetBinContent(j, i, accumulator[i][j]);
-    //     }
-    // }
-    // h2->GetXaxis()->SetTitle("theta");
-    // h2->GetYaxis()->SetTitle("rho");
-
-    // TCanvas *c2 = new TCanvas();
-    // h2->Draw("colz");
 
         // Extracting the theta and r values that correspond to the highest voted cell
         int threshold = 10;
@@ -458,19 +433,6 @@ int main() {
             continue;
         }
 
-    // Plotting the Isolated Data
-    // TGraph *gr1 = new TGraph(isolated_r.size(), isolated_z.data(), isolated_r.data());
-    // gr1->SetTitle("Isolated Data;Z (mm);R (mm)");
-    // gr1->SetMarkerColor(kBlue);
-    // gr1->SetMarkerStyle(20);
-    // gr1->SetMarkerSize(0.5);
-    // gr1->GetXaxis()->SetLimits(0.0, 1800.0);
-    // gr1->SetMinimum(0.0);
-    // gr1->SetMaximum(275.0);
-
-    // TCanvas *c3 = new TCanvas();
-    // gr1->Draw("AP");
-
         vector<float> sigma_r(isolated_r.size(), 0.0f);
         for (int i = 0; i < isolated_r.size(); i++) {
             if (isolated_r[i] < 150) {sigma_r[i] = 2.5;}
@@ -497,12 +459,12 @@ int main() {
         double intercept_err = D / (B*D - A*A);
         double covar = -A / (B*D - A*A);
 
-        double max_z = (*std::max_element(isolated_r.begin(), isolated_r.end()) - track_intercept) / track_slope;
+        // double max_z = (*std::max_element(isolated_r.begin(), isolated_r.end()) - track_intercept) / track_slope;
+        // double adjacent = max_z - interceptZ;
+        // double opposite = *std::max_element(isolated_r.begin(), isolated_r.end());
+        
         double interceptZ = -track_intercept / track_slope;
-
-        double adjacent = max_z - interceptZ;
-        double opposite = *std::max_element(isolated_r.begin(), isolated_r.end());
-        double LabAngle = atan2(opposite, adjacent) * 180.0/PI;
+        double LabAngle = atan2(track_slope, 1.0) * 180.0/PI;
         double uncertaintyAngle = 1 / (1.0 + track_slope*track_slope) * sqrt(slope_err) * 180.0/PI;
 
         double LSQChiVal = 0.0;
@@ -528,25 +490,6 @@ int main() {
             Ni70_Results << event << " " << "No Track!" << endl;
             continue;
         }
-
-    // TF1 *LSQFit = new TF1("LSQ Fit", "[0]*x + [1]", 0, 1900.0);
-    // LSQFit->SetParameters(track_slope, track_intercept);
-
-    // LSQFit->SetLineStyle(1);
-    // LSQFit->SetLineColor(2);
-    // LSQFit->SetLineWidth(2);
-    // LSQFit->Draw("L SAME"); // Draw on same plot as Isolated Data
-
-    // cout << "Angle: " << LabAngle << " +/- " << uncertaintyAngle << endl;
-
-    // Plot of original Bragg Curve
-    // TGraph *gr2 = new TGraph(reverseEnergyLoss.size(), reverseAlphaDistance.data(), reverseEnergyLoss.data());
-    // gr2->SetTitle("Energy Loss; Distance (mm); Energy Loss (MeV/mm)");
-    // gr2->SetMarkerColor(kRed);
-    // gr2->SetMarkerSize(400.0);
-
-    // TCanvas *c4 = new TCanvas();
-    // gr2->Draw("AP");
     
         // Convolving the ADC Data
         vector<double> centers;
@@ -583,59 +526,9 @@ int main() {
         vector<float> SigmaR(centers.size(), 5.0f);
         vector<float> SigmaQ(centers.size(), 200.0f);
 
-    // Plotting original ADC data and Convolved Data
-    // TCanvas *c5 = new TCanvas();
-    // c5->Divide(2, 1);
-    
-    // c5->cd(1);
-    // TGraph *gr4 = new TGraph(isolated_r.size(), isolated_r.data(), isolated_Q.data());
-    // gr4->SetTitle("ADC Data vs R; R (mm); Q (Arbitrary Units)");
-    // gr4->SetMarkerColor(kRed);
-    // gr4->SetMarkerStyle(8);
-    // gr4->SetMarkerSize(1.0);
-    // gr4->GetXaxis()->SetLimits(0, 300);
-    // gr4->Draw("AP");
-
-    // c5->cd(2);
-    // TGraph *gr5 = new TGraph(centers.size(), centers.data(), convQsum.data());
-    // gr5->SetTitle("Convolved Data; R (mm); Q (Arbitrary Units)");
-    // gr5->SetMarkerColor(kBlue);
-    // gr5->SetMarkerStyle(8);
-    // gr5->SetMarkerSize(1.0);
-    // gr5->GetXaxis()->SetLimits(0, 300);
-    // gr5->Draw("AP");
-
         float scaleFactor = sin(LabAngle*PI / 180.0);
 
-    // Plot of extrapolated Bragg Curve
-    // fSpline->SetLineColor(kRed);
-    // fSpline->SetLineWidth(1);
-    // fSpline->SetNpx(1500);
-    
-    // TGraph *gr3 = new TGraph(reverseEnergyLoss.size(), reverseAlphaDistance.data(), reverseEnergyLoss.data());
-    // gr3->SetTitle("11 MeV Bragg Curve Extrapolated; x (mm); dE/dx (MeV/mm)");
-    // gr3->SetMarkerColor(kBlue);
-    // gr3->SetMarkerSize(1.0);
-    // gr3->SetMarkerStyle(8);
-    // //gr3->GetXaxis()->SetLimits(3000, 3500);
-
-    // TCanvas *c6 = new TCanvas();
-    // gr3->Draw("AP");
-    // fSpline->Draw("L");
-
-    // TLegend *leg = new TLegend();
-    // leg->AddEntry(gr3, "Bragg Curve", "p");
-    // leg->AddEntry(fSpline, "Spline", "l");
-    // leg->Draw();
-
-    // TGraph *gr6 = new TGraph(ConvBraggSum.size(), BraggCenters.data(), ConvBraggSum.data());
-    // gr6->SetMarkerColor(kRed);
-    // gr6->SetMarkerSize(1.0);
-    // gr6->SetMarkerStyle(8);
-
-    // TCanvas *c7 = new TCanvas();
-    // gr6->Draw("AP");
-
+        // Performing Bragg Curve Fit on Convolved Data
         vector<double> xData(centers);
 
         vector<int> shiftRange; vector<int> scaleYRange;
@@ -698,27 +591,6 @@ int main() {
 
         // cout << "Chi Value: " << maxChi << endl;
         // cout << "Shift: " << bestShift << " Scale: " << bestScale << endl;
-
-    // Plotting fitted Convolved Bragg Curve to Convolved Data
-    // vector<double> yBraggPlot = ConvolvedBraggModel(centers, s1_knots, CoeffConvolvedBragg, bestScale, splineDeg, 
-    //     bestShift, scaleFactor);
-
-    // TGraph *gr7 = new TGraph(centers.size(), centers.data(), yBraggPlot.data());
-    // gr7->GetXaxis()->SetTitle("R (mm)");
-    // gr7->GetYaxis()->SetTitle("Q (Arbitrary)");
-    // gr7->GetXaxis()->SetLimits(0, 300);
-    // gr7->SetLineStyle(10);
-    // gr7->SetLineColor(2);
-    // gr7->SetLineWidth(1);
-
-    // TGraph *gr8 = new TGraph(convQsum.size(), centers.data(), convQsum.data());
-    // gr8->SetMarkerStyle(20);
-    // gr8->SetMarkerColor(kBlue);
-    // gr8->SetMarkerSize(0.5);
-
-    // TCanvas *c8 = new TCanvas();
-    // gr7->Draw("AL");
-    // gr8->Draw("P SAME");
 
         // Obtain Recoil Energy and Store in File
         double xRmin = xR_rev.front(); double xRmax = xR_rev.back();
