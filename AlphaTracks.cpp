@@ -63,7 +63,7 @@ int main() {
             r_pad_mapping[pad] = sqrt(x * x + y * y);
         }
     }
-`   // ======================================== Inputing HDF5 File =============================================
+   // ======================================== Inputing HDF5 File =============================================
 
     string RunFileName;
     cout << "Input run file name:" << endl;
@@ -289,7 +289,7 @@ int main() {
     vector<float> step_func_range;
     vector<float> tau_range;
 
-    vector<int> shiftRange; vector<int> scaleYRange; vector<double> QError; vector<double> yModel
+    vector<int> shiftRange; vector<int> scaleYRange; vector<double> QError; vector<double> yModel;
     for (int i = 3400; i < 3707; i++) {shiftRange.push_back(i);}
     for (int i = 400000; i < 600000; i += 10000) {scaleYRange.push_back(i);}
     vector<vector<double>> chiSquaredMatrix(shiftRange.size(), vector<double>(scaleYRange.size()));
@@ -509,7 +509,7 @@ int main() {
             
             double modelVal = track_slope * isolated_z[i] + track_intercept;
             double LSQDiff = isolated_r[i] - modelVal;
-            LSQChiVal += (LSQDiff*LSQDiff) / (sigma_r[i]*sigma_r[i]);
+            LSQChiVal += (LSQDiff*LSQDiff) / (weightLSQ*weightLSQ);
         }
         double reducedLSQChi = LSQChiVal / (isolated_r.size() - 2);
     
