@@ -33,7 +33,7 @@ vector<double> g(vector<float> &, vector<double> &, float, float &, float &);
 double BasisSplines(int, int, double, const vector<double> &);
 double EvaluateSpline(double, const vector<double> &, const vector<double> &, int);
 vector<double> ComputingCoeff(vector<double> &, vector<double> &, vector<double> &, int);
-vector<double> ConvolvedBraggModel(vector<double> &, vector<double> &, 
+void ConvolvedBraggModel(vector<double> &, vector<double> &, vector<double> &, 
 const vector<double> &, int, int, double);
 
 int main() {
@@ -42,6 +42,7 @@ int main() {
     char *argv[] = {};
     TApplication theApp("App", &argc, argv);
     
+    // ======================== Reading in data to convert pad to coordinates ===============================
     const int num_of_pads = 10240;
     vector<float> x_pad_mapping(num_of_pads, 0.0f);
     vector<float> y_pad_mapping(num_of_pads, 0.0f);
@@ -62,6 +63,7 @@ int main() {
             r_pad_mapping[pad] = sqrt(x * x + y * y);
         }
     }
+`   // ======================================== Inputing HDF5 File =============================================
 
     string RunFileName;
     cout << "Input run file name:" << endl;
@@ -76,9 +78,8 @@ int main() {
         return 1;
     }
     myfile.close();
-
-    // ofstream outputfile("AlphaTracksHTResults.txt", ios::trunc);
-    // outputfile << "Event" << "  " << "Slope" << "  " << "Intercept" << "  " << "Intersections" << endl;
+    
+    // ===================== Defining Output File and Reading & Reading In S800 PID Events =========================
     
     ofstream Ni70_Results("70Ni_Results.txt", ios::trunc);
     Ni70_Results << "Event" << "  " << "Angle" << "  " << "Er" << "  " << "Vertex" << "  " << "  " << "Ex" <<
@@ -91,8 +92,8 @@ int main() {
     while (S800EventResults >> PIDEvents) {
         EventsPID.push_back(PIDEvents);
     }
+    // ================================= Reading In Energy Loss File (SRIM) ======================================
 
-    // Reading in Energy Loss File
     ifstream SRIMEnergyLossFile("energy_loss_He_11MeV.txt");
     double energyLoss, distanceTravel;
 
@@ -142,7 +143,9 @@ int main() {
     }
     delete [] dEdx_Extension;
     dEdx_Extension = nullptr;
-
+    
+    // ================================== Spling the Original, Extrpolated Bragg Curve ==================================
+    
     // Splining the Original Bragg Curve
     int splineDeg = 3;
     vector<double> AlphaX(reverseAlphaDistance);
@@ -162,6 +165,8 @@ int main() {
 
     double xmin = AlphaX.front(); double xmax = AlphaX.back();
     TF1 *fSpline = new TF1("Spline", splineFunc, xmin, xmax, 0);
+
+    // ================================== Convolving and Splining the Bragg Curve ========================================
 
     // Discretizing Bragg Curve for Convolution
     vector<double> xDiscretization;
@@ -211,6 +216,7 @@ int main() {
 
     vector<double> CoeffConvolvedBragg = ComputingCoeff(BraggCenters, ConvBraggSum, s1_knots, splineDeg);
 
+    // ================================ Reading in Recoil Energy Data (SRIM) ===============================
     // Obtaining the Recoil Energy of Alphas
     ifstream EvXFile("EvsX_11MeV.txt");
     double EvX_Energy, EvX_Position;
@@ -237,16 +243,69 @@ int main() {
     auto EvXsplineFunc = [&](double *x, double *) {
         return EvaluateSpline(x[0], EvsXKnots, EvXcoeff, splineDeg);
     };
+    
+    // =============================== Declaring Histogram for Result Visualization ===================================
 
     //TH2D *hEhT = new TH2D("hEhT", "Recoil Energy vs Angle", 181, 0, 180, 181, 0, 3);
     TH1D *h1 = new TH1D("h1", "Excitation Spectrum", 50, 0, 50);
     // TH1D *hChi = new TH1D("hChi", "Chi-Squared (Normalized)", 2101, -100, 4000);
 
-    for (int i = 0; i < EventsPID.size(); i++) {
-        // Reading in the HDF5 File
-        int event = EventsPID[i]; 
-        H5::H5File file(H5FilePath, H5F_ACC_RDONLY);
+    // ============================ Declaring Constants, Vectors to Store Data =========================================
 
+    // Vectors to store raw data
+    vector<double> raw_data; vector<double> filtered_values;
+    vector<double> Q;
+    vector<double> z;
+    vector<double> x_list;
+    vector<double> y_list;
+    vector<double> r_list;
+
+    // Hough Transform Constants
+    const float theta_high = 90.0; const float theta_low = -90.0; const float theta_increment = 0.5;
+    const float r_increment = 2.0;
+    const float theta_diff = theta_high - theta_low;
+    const int thetabins = round(theta_diff/theta_increment) + 1.0;
+
+    const float AT_TPC_Radius = 275.0;
+    const float AT_TPC_Length = 1400.0;
+    const float rhoBounds = sqrt(AT_TPC_Radius*AT_TPC_Radius + AT_TPC_Length*AT_TPC_Length);
+    const float rhoMin = -rhoBounds, rhoMax = rhoBounds, rhoRange = rhoMax - rhoMin;
+    const int rbins = round(rhoRange/r_increment) + 1.0;
+        
+    const int threshold = 10;
+    vector<vector<int>> accumulator(rbins, vector<int> (thetabins));
+    vector<double> slopesHT; vector<double> interceptHT; vector<int> intersectionsHT;
+
+    // Vectors to store data from Hough Transform
+    vector<double> isolated_r;
+    vector<double> isolated_Q;
+    vector<double> isolated_z;
+    vector<double> isolated_x;
+    vector<double> isolated_y;
+
+    // Vectors storing convolved ADC data
+    vector<double> xDataConv;
+    vector<double> yDataConv;
+    vector<float> step_func_range;
+    vector<float> tau_range;
+
+    vector<int> shiftRange; vector<int> scaleYRange; vector<double> QError; vector<double> yModel
+    for (int i = 3400; i < 3707; i++) {shiftRange.push_back(i);}
+    for (int i = 400000; i < 600000; i += 10000) {scaleYRange.push_back(i);}
+    vector<vector<double>> chiSquaredMatrix(shiftRange.size(), vector<double>(scaleYRange.size()));
+
+    // ======================================== Event Loop =================================================================
+
+    // Opening HDF5 File
+    H5::H5File file(H5FilePath, H5F_ACC_RDONLY);
+    for (int i = 0; i < EventsPID.size(); i++) {
+
+        Q.clear(); z.clear(); x_list.clear(); y_list.clear(); r_list.clear();
+        slopesHT.clear(); interceptHT.clear(); intersectionsHT.clear();
+        isolated_r.clear(); isolated_Q.clear(); isolated_z.clear(); isolated_x.clear(); isolated_y.clear();
+        xDataConv.clear(); yDataConv.clear(); step_func_range.clear(); tau_range.clear();
+        
+        int event = EventsPID[i]; 
         string datasetPath = "get/evt" + to_string(event) + "_data";
 
         // Check to see if event number exists
@@ -264,7 +323,7 @@ int main() {
         hsize_t n_rows = dims_out[0];
         hsize_t n_cols = dims_out[1];
 
-        vector<double> raw_data(n_rows * n_cols);
+        raw_data.resize(n_rows * n_cols);
         dataset.read(raw_data.data(), H5::PredType::NATIVE_DOUBLE);
 
         // Reshape into 2D vector
@@ -275,27 +334,21 @@ int main() {
             }
         }
 
-        vector<double> Q;
-        vector<double> z;
-        vector<double> x_list;
-        vector<double> y_list;
-        vector<double> r_list;
-
         for (const auto& row : data) {
-            vector<double> filtered_values;
+            filtered_values.clear();
             
-            for (const auto& val : row) {
-                if (val < 5000) {filtered_values.push_back(val);}
-            }
-
+            for (const auto& val : row) {filtered_values.push_back(val);}
+        
             if (filtered_values.size() < 25) {continue;}
 
+            // Obtaining Mean Trace Values from First Twenty TBs
             vector<double> first_twenty(filtered_values.begin() + 5, filtered_values.begin() + 25);
             double mean_baseline = accumulate(first_twenty.begin(), first_twenty.end(), 0.0) / first_twenty.size();
 
             vector<double> traces(row.begin() + 10, row.begin() + 500);
             if (traces.empty()) {continue;}
 
+            // Obtaining adc max and corresponding timebucket
             double adc_max = *max_element(traces.begin(), traces.end());
             double adc = adc_max - mean_baseline;
             int tb_max = distance(traces.begin(), max_element(traces.begin(), traces.end()));
@@ -327,25 +380,11 @@ int main() {
         }
 
         // Here must use Hough Transform to isolate particle tracks and subsequently analyze them
-        float theta_high = 90.0; float theta_low = -90.0; float theta_increment = 0.5;
-        float r_increment = 2.0;
-        float theta_diff;
-    
-        // cout << "Input lowest theta value, highest, and increment (DEGREES/FLOATS): " << endl;
-        // cin >> theta_low >> theta_high >> theta_increment;
-        // cout << "Input r increment (mm/Float):  " << endl;
-        // cin >> r_increment;
-
-        theta_diff = theta_high - theta_low;
-        int thetabins = round(theta_diff/theta_increment) + 1.0;
-
-        const float AT_TPC_Radius = 275.0;
-        const float AT_TPC_Length = 1400.0;
-        const float rhoBounds = sqrt(AT_TPC_Radius*AT_TPC_Radius + AT_TPC_Length*AT_TPC_Length);
-        const float rhoMin = -rhoBounds, rhoMax = rhoBounds, rhoRange = rhoMax - rhoMin;
-        int rbins = round(rhoRange/r_increment) + 1.0;
-        
-        vector<vector<int>> accumulator(rbins, vector<int> (thetabins));
+        for (int i = 0; i < rbins; i++) {
+            for (int j = 0; j < thetabins; j++) {
+                accumulator[i][j] = 0;
+            }
+        }
 
         for (int i = 0; i < r_list.size(); i++) {
             for (float j = theta_low; j <= theta_high; j+=theta_increment) {
@@ -355,14 +394,11 @@ int main() {
                 
                 int rIndex = round((rho - rhoMin)/r_increment);
                 int thetaIndex = round((j - theta_low)/theta_increment);
-                //if (rIndex >= 0 && rIndex < rbins) {accumulator[rIndex][thetaIndex]++;}
                 accumulator[rIndex][thetaIndex]++;
             }
         }
 
         // Extracting the theta and r values that correspond to the highest voted cell
-        int threshold = 10;
-        vector<double> slopesHT; vector<double> interceptHT; vector<int> intersectionsHT;
         for (int i = 0; i < rbins; i++) {
             for (int j = 0; j < thetabins; j++) {
 
@@ -384,13 +420,7 @@ int main() {
             }
         }
 
-        // Vectors to store data from Hough Transform
-        vector<double> isolated_r;
-        vector<double> isolated_Q;
-        vector<double> isolated_z;
-        vector<double> isolated_x;
-        vector<double> isolated_y;
-
+        // Extracting identified track from Hough Transform slope and intercept
         int max_intersections = -1;
         double best_slope = 0.0; double best_intercept = 0.0;
 
@@ -403,9 +433,11 @@ int main() {
             }
         }
         
+        // Defining region perpendicular to identified HT line
         double perpDist = 7.5;
         double slope = best_slope;
         double intercept = best_intercept;
+        double distDenom = sqrt(1 + slope*slope);
 
         for (int i = 0; i < z.size(); i++) {
             double r_i = r_list[i];
@@ -415,7 +447,7 @@ int main() {
             if (isinf(slope)) {
                 dist = fabs(z_i - intercept);  // vertical line
             } else {
-                dist = fabs(r_i - slope * z_i - intercept) / sqrt(1 + slope*slope);
+                dist = fabs(r_i - slope * z_i - intercept) / distDenom;
             }
 
             if (dist < perpDist) {
@@ -433,24 +465,21 @@ int main() {
             continue;
         }
 
-        vector<float> sigma_r(isolated_r.size(), 0.0f);
-        for (int i = 0; i < isolated_r.size(); i++) {
-            if (isolated_r[i] < 150) {sigma_r[i] = 2.5;}
-            else {sigma_r[i] = 5.0;}
-        }
-
         // Performin LSQ Fit to Extract Scattering Angle
+        double weight;
+        double weightLow = 2.5; double weightHigh = 5.0;
         double A, B, C, D, E, F;
         A = 0.0; B = 0.0; C = 0.0; D = 0.0; E = 0.0; F = 0.0;
 
         for (int i = 0; i < isolated_r.size(); i++) {
+            weight = (isolated_r[i] < 150) ? weightLow : weightHigh;
 
-            A += isolated_z.at(i) / (sigma_r[i]*sigma_r[i]);
-            B += 1 / (sigma_r[i]*sigma_r[i]);
-            C += isolated_r.at(i) / (sigma_r[i]*sigma_r[i]);
-            D += (isolated_z.at(i)*isolated_z.at(i)) / (sigma_r[i]*sigma_r[i]);
-            E += (isolated_z.at(i)*isolated_r.at(i)) / (sigma_r[i]*sigma_r[i]);
-            F += (isolated_r.at(i)*isolated_r.at(i)) / (sigma_r[i]*sigma_r[i]);
+            A += isolated_z[i] / (weight*weight);
+            B += 1 / (weight*weight);
+            C += isolated_r[i] / (weight*weight);
+            D += (isolated_z[i]*isolated_z[i]) / (weight*weight);
+            E += (isolated_z[i]*isolated_r[i]) / (weight*weight);
+            F += (isolated_r[i]*isolated_r[i]) / (weight*weight);
         }
 
         double track_slope = (E*B - C*A) / (D*B - A*A);
@@ -458,30 +487,13 @@ int main() {
         double slope_err = B / (B*D - A*A);
         double intercept_err = D / (B*D - A*A);
         double covar = -A / (B*D - A*A);
-
-        // double max_z = (*std::max_element(isolated_r.begin(), isolated_r.end()) - track_intercept) / track_slope;
-        // double adjacent = max_z - interceptZ;
-        // double opposite = *std::max_element(isolated_r.begin(), isolated_r.end());
         
         double interceptZ = -track_intercept / track_slope;
         double LabAngle = atan2(track_slope, 1.0) * 180.0/PI;
         double uncertaintyAngle = 1 / (1.0 + track_slope*track_slope) * sqrt(slope_err) * 180.0/PI;
 
-        double LSQChiVal = 0.0;
-        TF1 *LSQModel = new TF1("Model", "[0]*x + [1]", 0, 1900.0);
-        LSQModel->SetParameters(track_slope, track_intercept);
-
-        for (int i = 0; i < isolated_r.size(); i++) {
-            
-            double modelVal = LSQModel->Eval(isolated_z[i]);
-            double LSQDiff = isolated_r[i] - modelVal;
-
-            LSQChiVal += (LSQDiff*LSQDiff) / (sigma_r[i]*sigma_r[i]);
-        }
-        double reducedLSQChi = LSQChiVal / (isolated_r.size() - 2);
-
         // Conditions to exclude events where the vertex is not within active volume and angles too high
-        if (interceptZ < 0.0 || interceptZ > 1300.0) {
+        if (interceptZ < 0.0 || interceptZ > 1400.0) {
             Ni70_Results << event << " " << "No Track!" << endl;
             continue;
         }
@@ -490,13 +502,18 @@ int main() {
             Ni70_Results << event << " " << "No Track!" << endl;
             continue;
         }
+
+        double LSQChiVal = 0.0; double weightLSQ;
+        for (int i = 0; i < isolated_r.size(); i++) {
+            weightLSQ = (isolated_r[i] < 150) ? weightLow : weightHigh;
+            
+            double modelVal = track_slope * isolated_z[i] + track_intercept;
+            double LSQDiff = isolated_r[i] - modelVal;
+            LSQChiVal += (LSQDiff*LSQDiff) / (sigma_r[i]*sigma_r[i]);
+        }
+        double reducedLSQChi = LSQChiVal / (isolated_r.size() - 2);
     
         // Convolving the ADC Data
-        vector<double> centers;
-        vector<double> convQsum;
-        vector<float> step_func_range;
-        vector<float> tau_range;
-
         float idx = 0.0; float idx1 = 21.75;
         while (idx < *std::max_element(isolated_r.begin(), isolated_r.end()) + 100.0) {
             step_func_range.push_back(idx);
@@ -512,49 +529,38 @@ int main() {
 
             float g_start, g_end;
             vector<double> g_vector = g(step_func_range, isolated_Q, tau, g_start, g_end);
-            centers.push_back(round((g_start + g_end) * 1000.0 / 2.0) / 1000.0);
+            xDataConv.push_back(round((g_start + g_end) * 1000.0 / 2.0) / 1000.0);
             
             float sum_charge = 0;
             for (int i = 0; i < isolated_r.size(); i++) {
-                if (isolated_r.at(i) >= g_start && isolated_r.at(i) <= g_end) {
-                    sum_charge += isolated_Q.at(i);
+                if (isolated_r[i] >= g_start && isolated_r[i] <= g_end) {
+                    sum_charge += isolated_Q[i];
                 }
             }
-            convQsum.push_back(sum_charge);
+            yDataConv.push_back(sum_charge);
         }
 
-        vector<float> SigmaR(centers.size(), 5.0f);
-        vector<float> SigmaQ(centers.size(), 200.0f);
-
         float scaleFactor = sin(LabAngle*PI / 180.0);
-
         // Performing Bragg Curve Fit on Convolved Data
-        vector<double> xData(centers);
-
-        vector<int> shiftRange; vector<int> scaleYRange;
-        shiftRange.clear(); scaleYRange.clear();
-
-        for (int i = 3400; i < 3707; i++) {shiftRange.push_back(i);}
-        for (int i = 400000; i < 600000; i += 10000) {scaleYRange.push_back(i);}
-
-        vector<double> yData(convQsum);
-        vector<float> QError; QError.reserve(yData.size());
-                for (int i = 0; i < yData.size(); i++) {QError.push_back(SigmaQ[i]);}
-
-        vector<vector<double>> chiSquaredMatrix(shiftRange.size(), vector<double>(scaleYRange.size(), NAN));
+        QError.assign(yDataConv.size(), 200.0);
         
+        // Must reset all elements in ChiSquared Matrix per event
+        for (auto &row : chiSquaredMatrix) {
+            std::fill(row.begin(), row.end(), NAN);
+        }
+
         double QThreshold = 500.0;
         for (int idxShift = 0; idxShift < shiftRange.size(); idxShift++) {
             
-            vector<double> yModel = ConvolvedBraggModel(xData, s1_knots, CoeffConvolvedBragg, 
-                    splineDeg, shiftRange[idxShift], scaleFactor);
+            ConvolvedBraggModel(yModel, xDataConv, s1_knots, CoeffConvolvedBragg, 
+                splineDeg, shiftRange[idxShift], scaleFactor);
 
             for (int idxScale = 0; idxScale < scaleYRange.size(); idxScale++) {
 
                 double chi2 = 0.0;
-                for (int k = 0; k < yData.size(); k++) {
-                    if (yData[k] > QThreshold) {
-                        double diff = yData[k] - yModel[k]*scaleYRange[idxScale];
+                for (int k = 0; k < yDataConv.size(); k++) {
+                    if (yDataConv[k] > QThreshold) {
+                        double diff = yDataConv[k] - yModel[k]*scaleYRange[idxScale];
                         chi2 += diff*diff / (QError[k]*QError[k]);
                     }
                 }
@@ -581,7 +587,7 @@ int main() {
 
         int bestShift = shiftRange[shiftIdx]; int bestScale = scaleYRange[scaleIdx];
 
-        double maxChi_norm = maxChi / convQsum.size();
+        double maxChi_norm = maxChi / yDataConv.size();
         if (maxChi_norm > 5.0 || maxChi_norm < 0.30) {
             Ni70_Results << event << " " << "Bad Chi Squared!" << endl;
             continue;
@@ -621,22 +627,6 @@ int main() {
 
         h1->Fill(ExcitationEnergy);
         //hEhT->Fill(LabAngle, EnergyofAlpha);
-    
-    // Plotting Splined Energy Curve
-    // EvXSpline->SetLineColor(kRed);
-    // EvXSpline->SetLineWidth(1);
-    // EvXSpline->SetNpx(1500);
-    
-    // TGraph *gr9 = new TGraph(xR_rev.size(), xR_rev.data(), energyR_rev.data());
-    // gr9->SetTitle("11 MeV Energy Curve ; x (mm); Energy (MeV)");
-    // gr9->SetMarkerColor(kBlue);
-    // gr9->SetMarkerSize(1.0);
-    // gr9->SetMarkerStyle(8);
-    // //gr3->GetXaxis()->SetLimits(3000, 3500);
-
-    // TCanvas *c9 = new TCanvas();
-    // gr9->Draw("AP");
-    // EvXSpline->Draw("L SAME");
     }
 
     h1->GetXaxis()->SetTitle("Excitation Energy (MeV)");
@@ -748,16 +738,14 @@ vector<double> ComputingCoeff(vector<double> &xDisc, vector<double> &ELossDisc, 
     return Coefficients;
 }
 
-vector<double> ConvolvedBraggModel(vector<double> &x,
+void ConvolvedBraggModel(vector<double> &y, vector<double> &x,
 vector<double> &knots, const vector<double> &SplineCoeff, int deg, int ParamShift, double angScale) {
 
-    vector<double> evalSpline;
+    y.resize(x.size());
     for (int i = 0; i < x.size(); i++) {
 
         double xOriginal = x.at(i) / angScale + ParamShift;
         double evaluation = EvaluateSpline(xOriginal, knots, SplineCoeff, deg);
-        evalSpline.push_back(evaluation);
+        y[i] = evaluation;
     }
-
-    return evalSpline;
 }
