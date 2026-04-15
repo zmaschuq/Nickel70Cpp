@@ -47,6 +47,7 @@ int main() {
     vector<float> x_pad_mapping(num_of_pads, 0.0f);
     vector<float> y_pad_mapping(num_of_pads, 0.0f);
     vector<float> r_pad_mapping(num_of_pads, 0.0f);
+    int linesRead = 0;
 
     // Read Mapping File
     ifstream MappingFile("center_of_mass.txt");
@@ -61,8 +62,11 @@ int main() {
             x_pad_mapping[pad] = x;
             y_pad_mapping[pad] = y;
             r_pad_mapping[pad] = sqrt(x * x + y * y);
+            linesRead++;
         }
+        if (linesRead == num_of_pads) {break;}
     }
+
    // ======================================== Inputing HDF5 File =============================================
 
     string RunFileName;
@@ -92,6 +96,7 @@ int main() {
     while (S800EventResults >> PIDEvents) {
         EventsPID.push_back(PIDEvents);
     }
+
     // ================================= Reading In Energy Loss File (SRIM) ======================================
 
     ifstream SRIMEnergyLossFile("energy_loss_He_11MeV.txt");
@@ -216,7 +221,8 @@ int main() {
 
     vector<double> CoeffConvolvedBragg = ComputingCoeff(BraggCenters, ConvBraggSum, s1_knots, splineDeg);
 
-    // ================================ Reading in Recoil Energy Data (SRIM) ===============================
+    // ================================ Reading in Recoil Energy Data (SRIM) =====================================
+
     // Obtaining the Recoil Energy of Alphas
     ifstream EvXFile("EvsX_11MeV.txt");
     double EvX_Energy, EvX_Position;
@@ -253,7 +259,7 @@ int main() {
     // ============================ Declaring Constants, Vectors to Store Data =========================================
 
     // Vectors to store raw data
-    vector<double> raw_data; vector<double> filtered_values;
+    vector<double> raw_data; vector<double> traceValues;
     vector<double> Q;
     vector<double> z;
     vector<double> x_list;
@@ -298,6 +304,8 @@ int main() {
 
     // Opening HDF5 File
     H5::H5File file(H5FilePath, H5F_ACC_RDONLY);
+    H5::DataSet dataset;
+    H5::DataSpace dataspace;
     for (int i = 0; i < EventsPID.size(); i++) {
 
         Q.clear(); z.clear(); x_list.clear(); y_list.clear(); r_list.clear();
@@ -314,8 +322,8 @@ int main() {
             continue; 
         }
 
-        H5::DataSet dataset = file.openDataSet(datasetPath);
-        H5::DataSpace dataspace = dataset.getSpace();
+        dataset = file.openDataSet(datasetPath);
+        dataspace = dataset.getSpace();
 
         const int RANK = dataspace.getSimpleExtentNdims();
         hsize_t dims_out[RANK];
@@ -335,17 +343,17 @@ int main() {
         }
 
         for (const auto& row : data) {
-            filtered_values.clear();
+            traceValues.clear();
             
-            for (const auto& val : row) {filtered_values.push_back(val);}
-        
-            if (filtered_values.size() < 25) {continue;}
+            for (auto rowElement = row.begin() + 5; rowElement != row.end(); rowElement++) {
+                traceValues.push_back(*rowElement);
+            }
 
             // Obtaining Mean Trace Values from First Twenty TBs
-            vector<double> first_twenty(filtered_values.begin() + 5, filtered_values.begin() + 25);
-            double mean_baseline = accumulate(first_twenty.begin(), first_twenty.end(), 0.0) / first_twenty.size();
+            vector<double> firstTwentyTB(traceValues.begin(), traceValues.begin() + 21);
+            double mean_baseline = accumulate(firstTwentyTB.begin(), firstTwentyTB.end(), 0.0) / firstTwentyTB.size();
 
-            vector<double> traces(row.begin() + 10, row.begin() + 500);
+            vector<double> traces(traceValues.begin() + 5, traceValues.begin() + 495);
             if (traces.empty()) {continue;}
 
             // Obtaining adc max and corresponding timebucket
@@ -353,11 +361,11 @@ int main() {
             double adc = adc_max - mean_baseline;
             int tb_max = distance(traces.begin(), max_element(traces.begin(), traces.end()));
 
-            const double drift_vel = 6.935e+6;
-            const double frequency = 3.125e+6;
+            const double drift_vel = 6.935e+6; // Units in  mm/s
+            const double frequency = 3.125e+6; // Units in Hz
             double z_pos = drift_vel * tb_max / frequency;
 
-            if (adc > 110 && row[4] > 0) {
+            if (adc > 110) {
                 
                 int cobo = static_cast<int>(row[0]);
                 int asad = static_cast<int>(row[1]);
