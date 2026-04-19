@@ -7,6 +7,7 @@
 
 #include "TCanvas.h"
 #include "TH2D.h"
+#include "TH2F.h"
 #include "TCutG.h"
 #include "TFile.h"
 #include "TTree.h"
@@ -16,8 +17,8 @@
 using namespace std;
 
 struct S800Data {
-    double tof_corr;
-    double de;
+    float tof_corr;
+    float de;
 };
 
 int main(int argc, char** argv) {
@@ -26,108 +27,99 @@ int main(int argc, char** argv) {
 
     ofstream S800Event("TrackEventsPID.txt", ios::trunc);
 
-    TH2D *h2 = new TH2D("h2", "70Ni PID: ftac_obj & fMultiHitTOF.fRf;TOF;Energy Loss", 1000, -2000, 2000, 1000, 0, 4000);
+    TH2F *h2 = new TH2F("h2", "68Ni PID Setting: MultiHit;TOF (Obj - E1Up);Energy Loss", 500, -200, 0, 1000, 1000, 3000);
+
+    string rootfile, h5filename;
+
+    cout << "Input root file name: " << endl;
+    cin >> rootfile;
+    cout << "Input HDF5 File Name:" << endl;
+    cin >> h5filename;
     
-    string root_path = "/groups/tahn1/data/70Ni_NSCL/rootS800/cal/run-2020-00.root";
-    string h5_path = "/groups/tahn1/data/70Ni_NSCL/h5/run_0020.h5";
+    string root_path = "/groups/tahn1/data/70Ni_NSCL/rootS800/cal/" + rootfile;
+    string h5_path = "/groups/tahn1/data/70Ni_NSCL/h5/" + h5filename;
 
     TFile *inputFile = TFile::Open(root_path.c_str(), "READ");
     TTree *tree = (TTree*)inputFile->Get("caltree");
 
     TLeaf *S800TS = tree->GetLeaf("fts");
     TLeaf *TotalDE = tree->GetLeaf("fIC.fsum");
-    TLeaf *tacObj = tree->GetLeaf("fMultiHitTOF.fRf");
-    TLeaf *MHfRf = tree->GetLeaf("fTOF.ftac_obj");
+    TLeaf *ScintObj = tree->GetLeaf("fMultiHitTOF.fObj");
+    TLeaf *ScintE1U = tree->GetLeaf("fMultiHitTOF.fE1Up");
 
+    vector<long long> S800TSVec;
     map<long long, S800Data> s800_map;
+
     int numEntries = tree->GetEntries();
+    S800TSVec.reserve(numEntries);
 
     for (Long64_t i = 0; i < numEntries; i++) {
         tree->GetEntry(i);
         
-        // Check to see if leaf exists, if it does get the value
-        double Rf_val = (MHfRf) ? MHfRf->GetValue() : 0;
-        double de_val  = (TotalDE) ? TotalDE->GetValue() : 0;
-        double tacObj_val = (tacObj && tacObj->GetLen() > 0) ? tacObj->GetValue(0) : 0;
+        float de_val  = TotalDE->GetValue();
+        float ScintVal1 = ScintE1U->GetValue(0);
+        float ScintVal2 = ScintObj->GetValue(0);
+        long long S800TimeStamp = S800TS->GetValue();
 
-        if (tacObj_val != 0 && Rf_val != 0 && de_val > 500) {
-            S800Data data;
-            data.de = de_val;
-            data.tof_corr = Rf_val - tacObj_val; 
+        S800Data data;
+        data.de = de_val;
+        data.tof_corr = ScintVal2; 
+
+        S800TSVec.push_back(S800TimeStamp);
             
-            s800_map[(long long)S800TS->GetValue()] = data;
-        }
+        s800_map[(long long)S800TimeStamp] = data;
+        h2->Fill(s800_map[S800TimeStamp].tof_corr, s800_map[S800TimeStamp].de);
     }
+
+    sort(S800TSVec.begin(), S800TSVec.end());
 
     H5::H5File file(h5_path.c_str(), H5F_ACC_RDONLY);
     H5::Group getGroup = file.openGroup("/get");
-    
-    long long ts_offset = -1492; 
-    long long ts_offset1 = -1493;
-    int match_count = 0;
-    int match_count1 = 0;
 
     TCutG *gate = new TCutG("gate1", 5);
-    // gate->SetPoint(0, 675, 1875);
-    // gate->SetPoint(1, 620, 1975);
-    // gate->SetPoint(2, 620, 2150);
-    // gate->SetPoint(3, 675, 2150);
-    // gate->SetPoint(4, 675, 1875);
+    gate->SetPoint(0, -47.5, 2200);
+    gate->SetPoint(1, -39, 2200);
+    gate->SetPoint(2, -39, 1850);
+    gate->SetPoint(3, -47.5, 1950);
+    gate->SetPoint(4, -47.5, 2200);
 
-    // gate->SetPoint(0, 675, 1750);
-    // gate->SetPoint(1, 675, 2150);
-    // gate->SetPoint(2, 740, 2150);
-    // gate->SetPoint(3, 740, 1750);
-    // gate->SetPoint(4, 675, 1750);
-
-    gate->SetPoint(0, 675, 1750);
-    gate->SetPoint(1, 675, 2150);
-    gate->SetPoint(2, 620, 2150);
-    gate->SetPoint(3, 620, 1750);
-    gate->SetPoint(4, 675, 1750);
-
-    for (int i = 1056688; i <= 1113266; i++) {
-        // Try-catch statement in the case event doesn't exist
+    for (int i = 10759; i <= 32028; i++) {
         try {
             H5::DataSet dataset = getGroup.openDataSet("evt" + to_string(i) + "_header");
             vector<long long> hb(3);
             dataset.read(hb.data(), H5::PredType::NATIVE_LLONG);
-            long long corrected_ts = hb[2] + ts_offset;
-            long long corrected_ts1 = hb[2] + ts_offset1;
+            long long ATTPCTS = hb[2];
 
-            if (s800_map.count(corrected_ts)) {
-                
-                h2->Fill(s800_map[corrected_ts].tof_corr, s800_map[corrected_ts].de);
-                if (gate->IsInside(s800_map[corrected_ts].tof_corr, s800_map[corrected_ts].de)) {
-                    S800Event << i << endl;
-                }
-                match_count++;
+            // BINARY SEARCH: Find the closest S800 timestamp
+            auto it = lower_bound(S800TSVec.begin(), S800TSVec.end(), ATTPCTS);
+
+            long long minDelta = -1;
+
+            if (it == S800TSVec.begin()) {
+                minDelta = abs(ATTPCTS - *it);
+            } else if (it == S800TSVec.end()) {
+                minDelta = abs(ATTPCTS - *(it - 1));
+            } else {
+                // It's between *it and *(it-1), find which is closer
+                minDelta = min(abs(ATTPCTS - *it), abs(ATTPCTS - *(it - 1)));
             }
-            else if (s800_map.count(corrected_ts1)) {
-
-                h2->Fill(s800_map[corrected_ts1].tof_corr, s800_map[corrected_ts1].de);
-                if (gate->IsInside(s800_map[corrected_ts1].tof_corr, s800_map[corrected_ts1].de)) {
-                    S800Event << i << endl;
-                }
-                match_count1++;
+            
+            long long TS_Offset = ATTPCTS - minDelta;
+            if (gate->IsInside(s800_map[TS_Offset].tof_corr, s800_map[TS_Offset].de)) {
+                S800Event << i << endl;
             }
 
         } catch (...) { continue; }
     }
 
-    cout << "Matches Plotted for 1492: " << match_count << endl;
-    cout << "Matches Plotted for 1493: " << match_count1 << endl;
-
-    TCanvas *c1 = new TCanvas("c1", "70Ni PID - Corrected", 1000, 800);
+    TCanvas *c1 = new TCanvas();
     c1->SetLogz(); 
-    h2->SetStats(0);
+    //h2->SetStats(0);
     
     // Zoom to the data area
-    if (match_count > 0) {
-        h2->GetXaxis()->SetRangeUser(h2->GetMean(1)-500, h2->GetMean(1)+500);
-        h2->GetYaxis()->SetRangeUser(h2->GetMean(2)-1000, h2->GetMean(2)+1000);
-    }
-
+    h2->GetXaxis()->SetRangeUser(h2->GetMean(1)-150, h2->GetMean(1)+150);
+    h2->GetYaxis()->SetRangeUser(h2->GetMean(2)-1000, h2->GetMean(2)+1000);
+    
     h2->Draw("colz");
     gate->Draw("SAME");
     app.Run();
