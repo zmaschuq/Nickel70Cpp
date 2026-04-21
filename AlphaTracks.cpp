@@ -304,8 +304,7 @@ int main() {
 
     // Opening HDF5 File
     H5::H5File file(H5FilePath, H5F_ACC_RDONLY);
-    H5::DataSet dataset;
-    H5::DataSpace dataspace;
+
     for (int i = 0; i < EventsPID.size(); i++) {
 
         Q.clear(); z.clear(); x_list.clear(); y_list.clear(); r_list.clear();
@@ -322,8 +321,8 @@ int main() {
             continue; 
         }
 
-        dataset = file.openDataSet(datasetPath);
-        dataspace = dataset.getSpace();
+        H5::DataSet dataset = file.openDataSet(datasetPath);
+        H5::DataSpace dataspace = dataset.getSpace();
 
         const int RANK = dataspace.getSimpleExtentNdims();
         hsize_t dims_out[RANK];
