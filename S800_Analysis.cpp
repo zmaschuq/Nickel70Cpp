@@ -73,9 +73,6 @@ int main(int argc, char** argv) {
 
     sort(S800TSVec.begin(), S800TSVec.end());
 
-    H5::H5File file(h5_path.c_str(), H5F_ACC_RDONLY);
-    H5::Group getGroup = file.openGroup("/get");
-
     TCutG *gate = new TCutG("gate1", 5);
     gate->SetPoint(0, -47.5, 2200);
     gate->SetPoint(1, -39, 2200);
@@ -83,33 +80,54 @@ int main(int argc, char** argv) {
     gate->SetPoint(3, -47.5, 1950);
     gate->SetPoint(4, -47.5, 2200);
 
-    for (int i = 10759; i <= 32028; i++) {
+    H5::H5File file(h5_path.c_str(), H5F_ACC_RDONLY);
+    H5::Group EventGroup = file.openGroup("/get");
+
+    int num_objs = EventGroup.getNumObjs();
+
+    for (int i = 0; i < num_objs; i++) {
         try {
-            H5::DataSet dataset = getGroup.openDataSet("evt" + to_string(i) + "_header");
-            vector<long long> hb(3);
-            dataset.read(hb.data(), H5::PredType::NATIVE_LLONG);
-            long long ATTPCTS = hb[2];
+            string objName = EventGroup.getObjnameByIdx(i);
 
-            // BINARY SEARCH: Find the closest S800 timestamp
-            auto it = lower_bound(S800TSVec.begin(), S800TSVec.end(), ATTPCTS);
+            // Find index of where substrings begin
+            int evtPos = objName.find("evt");
+            int headerPos = objName.find("_header");
 
-            long long minDelta = -1;
+            // Check if both "evt" and "_header" exist
+            if (evtPos != string::npos && headerPos != string::npos) {
+                
+                // Extract the number part between "evt" and "_header"
+                string evtNumStr = objName.substr(evtPos + 3, headerPos - (evtPos + 3));
+                int eventNum = stoi(evtNumStr);
 
-            if (it == S800TSVec.begin()) {
-                minDelta = abs(ATTPCTS - *it);
-            } else if (it == S800TSVec.end()) {
-                minDelta = abs(ATTPCTS - *(it - 1));
-            } else {
-                // It's between *it and *(it-1), find which is closer
-                minDelta = min(abs(ATTPCTS - *it), abs(ATTPCTS - *(it - 1)));
+                // Open the dataset using the dynamically retrieved name
+                H5::DataSet dataset = EventGroup.openDataSet(objName);
+                vector<long long> hb(3);
+                dataset.read(hb.data(), H5::PredType::NATIVE_LLONG);
+                long long ATTPCTS = hb[2];
+
+                // BINARY SEARCH: Find the closest S800 timestamp
+                auto it = lower_bound(S800TSVec.begin(), S800TSVec.end(), ATTPCTS);
+
+                long long minDelta = -1;
+
+                if (it == S800TSVec.begin()) {
+                    minDelta = abs(ATTPCTS - *it);
+                } else if (it == S800TSVec.end()) {
+                    minDelta = abs(ATTPCTS - *(it - 1));
+                } else {
+                    // It's between *it and *(it-1), find which is closer
+                    minDelta = min(abs(ATTPCTS - *it), abs(ATTPCTS - *(it - 1)));
+                }
+                
+                long long TS_Offset = ATTPCTS - minDelta;
+                
+                if (gate->IsInside(s800_map[TS_Offset].tof_corr, s800_map[TS_Offset].de)) {
+                    S800Event << eventNum << endl; 
+                }
             }
-            
-            long long TS_Offset = ATTPCTS - minDelta;
-            if (gate->IsInside(s800_map[TS_Offset].tof_corr, s800_map[TS_Offset].de)) {
-                S800Event << i << endl;
-            }
 
-        } catch (...) { continue; }
+        } catch (...) {continue; }
     }
 
     TCanvas *c1 = new TCanvas();
