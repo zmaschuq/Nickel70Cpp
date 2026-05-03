@@ -349,7 +349,7 @@ int main() {
             }
 
             // Obtaining Mean Trace Values from First Twenty TBs
-            vector<double> firstTwentyTB(traceValues.begin(), traceValues.begin() + 21);
+            vector<double> firstTwentyTB(traceValues.begin(), traceValues.begin() + 20);
             double mean_baseline = accumulate(firstTwentyTB.begin(), firstTwentyTB.end(), 0.0) / firstTwentyTB.size();
 
             vector<double> traces(traceValues.begin() + 5, traceValues.begin() + 495);
@@ -358,9 +358,9 @@ int main() {
             // Obtaining adc max and corresponding timebucket
             double adc_max = *max_element(traces.begin(), traces.end());
             double adc = adc_max - mean_baseline;
-            int tb_max = distance(traces.begin(), max_element(traces.begin(), traces.end()));
+            int tb_max = distance(traces.begin(), max_element(traces.begin(), traces.end())) + 5;
 
-            const double drift_vel = 6.935e+6; // Units in  mm/s
+            const double drift_vel = 6.391e+6; // Units in  mm/s
             const double frequency = 3.125e+6; // Units in Hz
             double z_pos = drift_vel * tb_max / frequency;
 
@@ -445,6 +445,7 @@ int main() {
         double slope = best_slope;
         double intercept = best_intercept;
         double distDenom = sqrt(1 + slope*slope);
+        bool InfiniteSlope = false;
 
         for (int i = 0; i < z.size(); i++) {
             double r_i = r_list[i];
@@ -453,6 +454,7 @@ int main() {
             double dist;
             if (isinf(slope)) {
                 dist = fabs(z_i - intercept);  // vertical line
+                InfiniteSlope = true;
             } else {
                 dist = fabs(r_i - slope * z_i - intercept) / distDenom;
             }
@@ -496,8 +498,10 @@ int main() {
         double covar = -A / (B*D - A*A);
         
         double interceptZ = -track_intercept / track_slope;
-        double LabAngle = atan2(track_slope, 1.0) * 180.0/PI;
+        double LabAngle;
         double uncertaintyAngle = 1 / (1.0 + track_slope*track_slope) * sqrt(slope_err) * 180.0/PI;
+
+        LabAngle = (InfiniteSlope == true) ? 90.0 : atan2(track_slope, 1.0) * 180.0/PI;
 
         // Conditions to exclude events where the vertex is not within active volume and angles too high
         if (interceptZ < 0.0 || interceptZ > 1400.0) {
@@ -505,7 +509,7 @@ int main() {
             continue;
         }
 
-        if (LabAngle > 90.0) {
+        if (LabAngle > 90.0 || LabAngle < 0) {
             Ni70_Results << event << " " << "No Track!" << endl;
             continue;
         }
