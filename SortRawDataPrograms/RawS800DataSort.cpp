@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
 
         if (iss >> pad >> x >> y) {
             x_pad_mapping[pad] = x;
-            y_pad_mapping[pad] = y;
+            y_pad_mapping[pad] = y; 
             r_pad_mapping[pad] = sqrt(x * x + y * y);
             linesRead++;
         }
