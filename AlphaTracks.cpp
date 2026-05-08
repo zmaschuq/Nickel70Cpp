@@ -102,7 +102,7 @@ int main() {
     ifstream SRIMEnergyLossFile("energy_loss_He_11MeV.txt");
     double energyLoss, distanceTravel;
 
-    vector<double> dEdx;
+    vector<float> dEdx;
     vector<double> alphaDistanceTravel;
     vector<double> reverseEnergyLoss;
     vector<double> reverseAlphaDistance;
