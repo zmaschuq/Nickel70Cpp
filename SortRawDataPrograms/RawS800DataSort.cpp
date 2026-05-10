@@ -84,15 +84,12 @@ int main(int argc, char** argv) {
     bS800cal->SetAddress(&s800cal);
 
     std::map<long long, S800Data> s800MapData;
-    std::vector<long long> storeS800TS;
-    storeS800TS.reserve(entries);
 
     for (Int_t i = 0; i < entries; i++) {
         s800cal->Clear();
         bS800cal->GetEntry(i);
 
         long long int S800TS = s800cal->GetTS();
-        storeS800TS.push_back(S800TS);
 
         Double_t FirstObj = s800cal->GetMultiHitTOF()->GetFirstObjHit();
         Double_t FirstXf = s800cal->GetMultiHitTOF()->GetFirstXfHit();
@@ -170,7 +167,6 @@ int main(int argc, char** argv) {
 
     std::string h5filename = "run_0140.h5";
     std::string H5FilePath = "/groups/tahn1/data/70Ni_NSCL/h5/" + h5filename;
-    std::sort(storeS800TS.begin(), storeS800TS.end());
 
     H5::H5File file(H5FilePath.c_str(), H5F_ACC_RDONLY);
     H5::Group EventGroup = file.openGroup("/get");
@@ -185,6 +181,8 @@ int main(int argc, char** argv) {
     int num_objs = EventGroup.getNumObjs();
     int num_events = num_objs / 2;
     int processed_events = 0;
+    int noMatch = 0;
+    int success = 0;
 
     while (processed_events < num_events) {
         
@@ -206,92 +204,93 @@ int main(int argc, char** argv) {
             HeaderData.read(hb.data(), H5::PredType::NATIVE_LLONG);
             ATTPC_TimeStamp = hb[2];
 
-            auto it = std::lower_bound(storeS800TS.begin(), storeS800TS.end(), ATTPC_TimeStamp);
+            long long offsetted = ATTPC_TimeStamp - 1492;
+            long long offsetted1 = ATTPC_TimeStamp - 1493;
+            long long offsetted2 = ATTPC_TimeStamp - 1491;
+            long long calcS800TS = 0;
+            
+            if (s800MapData.find(offsetted) != s800MapData.end()) {calcS800TS = offsetted;}
+            else if (s800MapData.find(offsetted1) != s800MapData.end()) {calcS800TS = offsetted1;}
+            else if (s800MapData.find(offsetted2) != s800MapData.end()) {calcS800TS = offsetted2;}
 
-            long long minDelta = -1;
-
-            if (it == storeS800TS.begin()) {
-                minDelta = std::abs(ATTPC_TimeStamp - *it);
-            } else if (it == storeS800TS.end()) {
-                minDelta = std::abs(ATTPC_TimeStamp - *(it - 1));
-            } else {
-                // It's between *it and *(it-1), find which is closer
-                minDelta = std::min(std::abs(ATTPC_TimeStamp - *it), std::abs(ATTPC_TimeStamp - *(it - 1)));
+            if (calcS800TS == 0) {
+                CurrentEvent++;
+                processed_events++
+                noMatch++;
+                continue;
             }
-                
-            long long calcS800TS = ATTPC_TimeStamp - minDelta;
-            if (s800MapData.find(calcS800TS) != s800MapData.end()) {
 
-                H5::DataSet dataset = EventGroup.openDataSet(DataObjName);
-                H5::DataSpace dataspace = dataset.getSpace();
+            H5::DataSet dataset = EventGroup.openDataSet(DataObjName);
+            H5::DataSpace dataspace = dataset.getSpace();
 
-                const int RANK = dataspace.getSimpleExtentNdims();
-                hsize_t dims_out[RANK];
-                dataspace.getSimpleExtentDims(dims_out, NULL);
-                hsize_t n_rows = dims_out[0];
-                hsize_t n_cols = dims_out[1];
+            const int RANK = dataspace.getSimpleExtentNdims();
+            hsize_t dims_out[RANK];
+            dataspace.getSimpleExtentDims(dims_out, NULL);
+            hsize_t n_rows = dims_out[0];
+            hsize_t n_cols = dims_out[1];
 
-                raw_data.resize(n_rows * n_cols);
-                dataset.read(raw_data.data(), H5::PredType::NATIVE_DOUBLE);
+            raw_data.resize(n_rows * n_cols);
+            dataset.read(raw_data.data(), H5::PredType::NATIVE_DOUBLE);
 
-                // Reshape into 2D vector
-                std::vector<vector<double>> data(n_rows, vector<double>(n_cols));
-                for (size_t i = 0; i < n_rows; ++i) {
-                    for (size_t j = 0; j < n_cols; ++j) {
-                        data[i][j] = raw_data[i * n_cols + j];
-                    }
+            // Reshape into 2D vector
+            std::vector<vector<double>> data(n_rows, vector<double>(n_cols));
+            for (size_t i = 0; i < n_rows; ++i) {
+                for (size_t j = 0; j < n_cols; ++j) {
+                    data[i][j] = raw_data[i * n_cols + j];
                 }
+            }
 
-                for (const auto& row : data) {
-                    traceValues.clear();
+            for (const auto& row : data) {
+                traceValues.clear();
                     
-                    for (auto rowElement = row.begin() + 5; rowElement != row.end(); rowElement++) {
-                        traceValues.push_back(*rowElement);
-                    }
-
-                    // Obtaining Mean Trace Values from First Twenty TBs
-                    std::vector<double> firstTwentyTB(traceValues.begin(), traceValues.begin() + 20);
-                    double mean_baseline = accumulate(firstTwentyTB.begin(), firstTwentyTB.end(), 0.0) / firstTwentyTB.size();
-
-                    std::vector<double> traces(traceValues.begin() + 5, traceValues.begin() + 495);
-                    if (traces.empty()) {continue;}
-
-                    // Obtaining adc max and corresponding timebucket
-                    double adc_max = *max_element(traces.begin(), traces.end());
-                    double adc = adc_max - mean_baseline;
-                    int tb_max = distance(traces.begin(), max_element(traces.begin(), traces.end())) + 5;
-
-                    // const double drift_vel = 6.391e+6; // Units in  mm/s
-                    // const double frequency = 3.125e+6; // Units in Hz
-                    // double z_pos = drift_vel * tb_max / frequency;
-
-                    if (adc > 110) {
-                        
-                        int cobo = static_cast<int>(row[0]);
-                        int asad = static_cast<int>(row[1]);
-                        int aget = static_cast<int>(row[2]);
-                        int channel = static_cast<int>(row[3]);
-                        int pad = static_cast<int>(row[4]);
-
-                        x_list.push_back(x_pad_mapping[pad]);
-                        y_list.push_back(y_pad_mapping[pad]);
-                        r_list.push_back(r_pad_mapping[pad]);
-                        Q.push_back(adc);
-                        tb.push_back(tb_max);
-                    }
+                for (auto rowElement = row.begin() + 5; rowElement != row.end(); rowElement++) {
+                    traceValues.push_back(*rowElement);
                 }
 
-                S800TimeStamp = calcS800TS;
-                IC = s800MapData[calcS800TS].ICSum;
-                ftac1 = s800MapData[calcS800TS].CRDC1_yraw;
-                xfit1 = s800MapData[calcS800TS].CRDC1_xraw;
-                ftac2 = s800MapData[calcS800TS].CRDC2_yraw;
-                xfit2 = s800MapData[calcS800TS].CRDC2_xraw;
-                E1UpSignal = s800MapData[calcS800TS].E1UpScint;
-                E1DownSignal = s800MapData[calcS800TS].E1DownScint;
-                ObjSignal = &(s800MapData[calcS800TS].ObjScint);
-                xfpSignal = &(s800MapData[calcS800TS].xfpScint);
+                // Obtaining Mean Trace Values from First Twenty TBs
+                std::vector<double> firstTwentyTB(traceValues.begin(), traceValues.begin() + 20);
+                double mean_baseline = accumulate(firstTwentyTB.begin(), firstTwentyTB.end(), 0.0) / firstTwentyTB.size();
+
+                std::vector<double> traces(traceValues.begin() + 5, traceValues.begin() + 495);
+                if (traces.empty()) {continue;}
+
+                // Obtaining adc max and corresponding timebucket
+                double adc_max = *max_element(traces.begin(), traces.end());
+                double adc = adc_max - mean_baseline;
+                int tb_max = distance(traces.begin(), max_element(traces.begin(), traces.end())) + 5;
+
+                // const double drift_vel = 6.391e+6; // Units in  mm/s
+                // const double frequency = 3.125e+6; // Units in Hz
+                // double z_pos = drift_vel * tb_max / frequency;
+
+                if (adc > 110) {
+                        
+                    // int cobo = static_cast<int>(row[0]);
+                    // int asad = static_cast<int>(row[1]);
+                    // int aget = static_cast<int>(row[2]);
+                    // int channel = static_cast<int>(row[3]);
+                    int pad = static_cast<int>(row[4]);
+
+                    x_list.push_back(x_pad_mapping[pad]);
+                    y_list.push_back(y_pad_mapping[pad]);
+                    r_list.push_back(r_pad_mapping[pad]);
+                    Q.push_back(adc);
+                    tb.push_back(tb_max);
+                }
+            
             }
+            S800TimeStamp = calcS800TS;
+            IC = s800MapData[calcS800TS].ICSum;
+            ftac1 = s800MapData[calcS800TS].CRDC1_yraw;
+            xfit1 = s800MapData[calcS800TS].CRDC1_xraw;
+            ftac2 = s800MapData[calcS800TS].CRDC2_yraw;
+            xfit2 = s800MapData[calcS800TS].CRDC2_xraw;
+            E1UpSignal = s800MapData[calcS800TS].E1UpScint;
+            E1DownSignal = s800MapData[calcS800TS].E1DownScint;
+            ObjSignal = &(s800MapData[calcS800TS].ObjScint);
+            xfpSignal = &(s800MapData[calcS800TS].xfpScint);
+            
+
         } catch (...) {
             CurrentEvent++;
             continue;
@@ -300,8 +299,10 @@ int main(int argc, char** argv) {
         rawTree->Fill();
         CurrentEvent++;
         processed_events++;
+        success++;
     }
 
+    cout << "Successes: " << success << " No Matches: " << noMatch << endl;
     RawOutput->Write();
     RawOutput->Close();
 
