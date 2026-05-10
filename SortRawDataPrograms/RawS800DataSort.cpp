@@ -215,7 +215,7 @@ int main(int argc, char** argv) {
 
             if (calcS800TS == 0) {
                 CurrentEvent++;
-                processed_events++
+                processed_events++;
                 noMatch++;
                 continue;
             }
@@ -293,6 +293,7 @@ int main(int argc, char** argv) {
 
         } catch (...) {
             CurrentEvent++;
+            processed_events++;
             continue;
         }
 
