@@ -43,6 +43,10 @@ struct S800Data {
 
 int main(int argc, char** argv) {
 
+    std::string RawRun = argv[1];
+    std::string S800FileName = argv[2];
+    std::string h5filename = argv[3];
+
     // ======================== Reading in data to convert pad to coordinates ===============================
     const int num_of_pads = 10240;
     std::vector<float> x_pad_mapping(num_of_pads, 0.0f);
@@ -68,12 +72,12 @@ int main(int argc, char** argv) {
         if (linesRead == num_of_pads) {break;}
     }
 
-    std::string RawRun = "140";
+    //std::string RawRun = "139";
     std::string RawRunRootFile = "run_" + RawRun + "_Raw.root";
     TFile *RawOutput = TFile::Open(RawRunRootFile.c_str(), "RECREATE");
     TTree *rawTree = new TTree("RawData", "Raw Data");
 
-    std::string S800FileName = "run-2140-00.root";
+    //std::string S800FileName = "run-2139-00.root";
     std::string root_path = "/groups/tahn1/data/70Ni_NSCL/rootS800/cal/" + S800FileName;
     TFile *inputFile = TFile::Open(root_path.c_str(), "READ");
     TTree *tree = (TTree*)inputFile->Get("caltree");
@@ -165,7 +169,7 @@ int main(int argc, char** argv) {
     rawTree->Branch("Object", &ObjSignal);
     rawTree->Branch("XFP", &xfpSignal);
 
-    std::string h5filename = "run_0140.h5";
+    //std::string h5filename = "run_0139.h5";
     std::string H5FilePath = "/groups/tahn1/data/70Ni_NSCL/h5/" + h5filename;
 
     H5::H5File file(H5FilePath.c_str(), H5F_ACC_RDONLY);
@@ -303,6 +307,7 @@ int main(int argc, char** argv) {
         success++;
     }
 
+    cout << "Total # of Events in Run: " << num_events << endl;
     cout << "Successes: " << success << " No Matches: " << noMatch << endl;
     RawOutput->Write();
     RawOutput->Close();
