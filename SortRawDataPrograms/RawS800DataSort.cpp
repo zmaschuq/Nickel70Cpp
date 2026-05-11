@@ -237,22 +237,12 @@ int main(int argc, char** argv) {
             raw_data.resize(n_rows * n_cols);
             dataset.read(raw_data.data(), H5::PredType::NATIVE_UINT16);
 
-            // Resize and reshape into 2D vector
-            data.resize(n_rows);
-            for (int i = 0; i < n_cols; i++) {data[i].resize(n_cols);}
-
-            for (size_t i = 0; i < n_rows; ++i) {
-                for (size_t j = 0; j < n_cols; ++j) {
-                    data[i][j] = raw_data[i * n_cols + j];
-                }
-            }
-
-            for (const auto& row : data) {
+            for (int i = 0; i < n_rows; i++) {
                 traceValues.clear();
-                    
-                for (auto rowElement = row.begin() + 5; rowElement != row.end(); rowElement++) {
-                    traceValues.push_back(*rowElement);
-                }
+                
+                auto row_start = raw_data.begin() + (i * n_cols);
+                auto row_end = row_start + n_cols;
+                traceValues.assign(row_start + 5, row_end);
 
                 // Obtaining Mean Trace Values from First Twenty TBs
                 firstTwentyTB.assign(traceValues.begin(), traceValues.begin() + 20);
