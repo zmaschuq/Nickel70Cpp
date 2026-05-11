@@ -29,13 +29,13 @@
 
 struct S800Data {
 
-    double ICSum;
-    double CRDC1_yraw;
-    double CRDC1_xraw;
-    double CRDC2_yraw;
-    double CRDC2_xraw;
-    double E1UpScint;
-    double E1DownScint;
+    float ICSum;
+    float CRDC1_yraw;
+    float CRDC1_xraw;
+    float CRDC2_yraw;
+    float CRDC2_xraw;
+    float E1UpScint;
+    float E1DownScint;
     
     vector<float> ObjScint;
     vector<float> xfpScint;
@@ -93,26 +93,26 @@ int main(int argc, char** argv) {
         s800cal->Clear();
         bS800cal->GetEntry(i);
 
-        long long int S800TS = s800cal->GetTS();
+        Long64_t S800TS = s800cal->GetTS();
 
-        Double_t FirstObj = s800cal->GetMultiHitTOF()->GetFirstObjHit();
-        Double_t FirstXf = s800cal->GetMultiHitTOF()->GetFirstXfHit();
-        Double_t FirstE1Up = s800cal->GetMultiHitTOF()->GetFirstE1UpHit();
-        Double_t FirstE1Down = s800cal->GetMultiHitTOF()->GetFirstE1DownHit();
-        Double_t FirstRf = s800cal->GetMultiHitTOF()->GetFirstRfHit();
+        Float_t FirstObj = s800cal->GetMultiHitTOF()->GetFirstObjHit();
+        Float_t FirstXf = s800cal->GetMultiHitTOF()->GetFirstXfHit();
+        Float_t FirstE1Up = s800cal->GetMultiHitTOF()->GetFirstE1UpHit();
+        Float_t FirstE1Down = s800cal->GetMultiHitTOF()->GetFirstE1DownHit();
+        Float_t FirstRf = s800cal->GetMultiHitTOF()->GetFirstRfHit();
 
 
         std::vector<Float_t> fObj = s800cal->GetMultiHitTOF()->GetMTDCObj();
         std::vector<Float_t> fXf = s800cal->GetMultiHitTOF()->GetMTDCXf();
 
         // Obtaining raw CRDC values and Calibrating
-        Double_t x0_fit = s800cal->GetCRDC(0)->GetXfit();
-        Double_t x1_fit = s800cal->GetCRDC(1)->GetXfit();
-        Double_t y0_raw = s800cal->GetCRDC(0)->GetTAC();
-        Double_t y1_raw = s800cal->GetCRDC(1)->GetTAC();
+        Float_t x0_fit = s800cal->GetCRDC(0)->GetXfit();
+        Float_t x1_fit = s800cal->GetCRDC(1)->GetXfit();
+        Float_t y0_raw = s800cal->GetCRDC(0)->GetTAC();
+        Float_t y1_raw = s800cal->GetCRDC(1)->GetTAC();
 
         // Extracting Energy Loss
-        Double_t EnergyLoss = s800cal->GetIC()->GetSum();
+        Float_t EnergyLoss = s800cal->GetIC()->GetSum();
 
         S800Data data;
 
@@ -130,12 +130,16 @@ int main(int argc, char** argv) {
         s800MapData[S800TS] = data;
     }
 
-    std::vector<Double_t> raw_data; std::vector<Double_t> traceValues;
-    std::vector<Double_t> Q;
+    std::vector<float> raw_data; std::vector<float> traceValues;
+    std::vector<std::vector<double>> data;
+    std::vector<float> firstTwentyTB; std::vector<float> traces;
+    firstTwentyTB.reserve(20);
+
+    std::vector<Float_t> Q;
     std::vector<Int_t> tb;
-    std::vector<Double_t> x_list;
-    std::vector<Double_t> y_list;
-    std::vector<Double_t> r_list;
+    std::vector<Float_t> x_list;
+    std::vector<Float_t> y_list;
+    std::vector<Float_t> r_list;
     Int_t Event;
     Long64_t ATTPC_TimeStamp;
 
@@ -150,22 +154,22 @@ int main(int argc, char** argv) {
 
     // Branches to Hold S800 Data
     Long64_t S800TimeStamp;
-    Double_t IC;
-    Double_t ftac1, ftac2;
-    Double_t xfit1, xfit2;
-    Double_t E1UpSignal;
-    Double_t E1DownSignal;
+    Float_t IC;
+    Float_t ftac1, ftac2;
+    Float_t xfit1, xfit2;
+    Float_t E1UpSignal;
+    Float_t E1DownSignal;
     std::vector<Float_t> *ObjSignal = nullptr;
     std::vector<Float_t> *xfpSignal = nullptr;
 
     rawTree->Branch("S800TimeStamp", &S800TimeStamp, "S800TimeStamp/L");
-    rawTree->Branch("EnergyLoss", &IC, "IC/D");
-    rawTree->Branch("CRDC1_tac", &ftac1, "ftac1/D");
-    rawTree->Branch("CRDC1_xfit", &xfit1, "xfit1/D");
-    rawTree->Branch("CRDC2_tac", &ftac2, "ftac2/D");
-    rawTree->Branch("CRDC2_xfit", &xfit2, "xfit2/D");
-    rawTree->Branch("E1Up", &E1UpSignal, "E1UpSignal/D");
-    rawTree->Branch("E1Down", &E1DownSignal, "E1DownSignal/D");
+    rawTree->Branch("EnergyLoss", &IC, "IC/F");
+    rawTree->Branch("CRDC1_tac", &ftac1, "ftac1/F");
+    rawTree->Branch("CRDC1_xfit", &xfit1, "xfit1/F");
+    rawTree->Branch("CRDC2_tac", &ftac2, "ftac2/F");
+    rawTree->Branch("CRDC2_xfit", &xfit2, "xfit2/F");
+    rawTree->Branch("E1Up", &E1UpSignal, "E1UpSignal/F");
+    rawTree->Branch("E1Down", &E1DownSignal, "E1DownSignal/F");
     rawTree->Branch("Object", &ObjSignal);
     rawTree->Branch("XFP", &xfpSignal);
 
@@ -191,6 +195,7 @@ int main(int argc, char** argv) {
     while (processed_events < num_events) {
         
         Q.clear(); tb.clear(); x_list.clear(); y_list.clear(); r_list.clear();
+        firstTwentyTB.clear(); traces.clear();
         Event = CurrentEvent;
 
         try {
@@ -209,13 +214,9 @@ int main(int argc, char** argv) {
             ATTPC_TimeStamp = hb[2];
 
             long long offsetted = ATTPC_TimeStamp - 1492;
-            long long offsetted1 = ATTPC_TimeStamp - 1493;
-            long long offsetted2 = ATTPC_TimeStamp - 1491;
             long long calcS800TS = 0;
             
             if (s800MapData.find(offsetted) != s800MapData.end()) {calcS800TS = offsetted;}
-            else if (s800MapData.find(offsetted1) != s800MapData.end()) {calcS800TS = offsetted1;}
-            else if (s800MapData.find(offsetted2) != s800MapData.end()) {calcS800TS = offsetted2;}
 
             if (calcS800TS == 0) {
                 CurrentEvent++;
@@ -234,10 +235,12 @@ int main(int argc, char** argv) {
             hsize_t n_cols = dims_out[1];
 
             raw_data.resize(n_rows * n_cols);
-            dataset.read(raw_data.data(), H5::PredType::NATIVE_DOUBLE);
+            dataset.read(raw_data.data(), H5::PredType::NATIVE_UINT16);
 
-            // Reshape into 2D vector
-            std::vector<vector<double>> data(n_rows, vector<double>(n_cols));
+            // Resize and reshape into 2D vector
+            data.resize(n_rows);
+            for (int i = 0; i < n_cols; i++) {data[i].resize(n_cols);}
+
             for (size_t i = 0; i < n_rows; ++i) {
                 for (size_t j = 0; j < n_cols; ++j) {
                     data[i][j] = raw_data[i * n_cols + j];
@@ -252,16 +255,16 @@ int main(int argc, char** argv) {
                 }
 
                 // Obtaining Mean Trace Values from First Twenty TBs
-                std::vector<double> firstTwentyTB(traceValues.begin(), traceValues.begin() + 20);
-                double mean_baseline = accumulate(firstTwentyTB.begin(), firstTwentyTB.end(), 0.0) / firstTwentyTB.size();
+                firstTwentyTB.assign(traceValues.begin(), traceValues.begin() + 20);
+                float mean_baseline = std::accumulate(firstTwentyTB.begin(), firstTwentyTB.end(), 0.0) / firstTwentyTB.size();
 
-                std::vector<double> traces(traceValues.begin() + 5, traceValues.begin() + 495);
+                traces.assign(traceValues.begin() + 5, traceValues.begin() + 495);
                 if (traces.empty()) {continue;}
 
                 // Obtaining adc max and corresponding timebucket
-                double adc_max = *max_element(traces.begin(), traces.end());
-                double adc = adc_max - mean_baseline;
-                int tb_max = distance(traces.begin(), max_element(traces.begin(), traces.end())) + 5;
+                float adc_max = *std::max_element(traces.begin(), traces.end());
+                float adc = adc_max - mean_baseline;
+                int tb_max = std::distance(traces.begin(), std::max_element(traces.begin(), traces.end())) + 5;
 
                 // const double drift_vel = 6.391e+6; // Units in  mm/s
                 // const double frequency = 3.125e+6; // Units in Hz
