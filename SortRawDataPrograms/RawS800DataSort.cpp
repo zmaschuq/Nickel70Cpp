@@ -259,21 +259,18 @@ int main(int argc, char** argv) {
                 // const double drift_vel = 6.391e+6; // Units in  mm/s
                 // const double frequency = 3.125e+6; // Units in Hz
                 // double z_pos = drift_vel * tb_max / frequency;
-
-                if (adc > 110) {
                         
-                    // int cobo = static_cast<int>(row[0]);
-                    // int asad = static_cast<int>(row[1]);
-                    // int aget = static_cast<int>(row[2]);
-                    // int channel = static_cast<int>(row[3]);
-                    int pad = static_cast<int>(row[4]);
+                // int cobo = static_cast<int>(row[0]);
+                // int asad = static_cast<int>(row[1]);
+                // int aget = static_cast<int>(row[2]);
+                // int channel = static_cast<int>(row[3]);
+                int pad = static_cast<int>(*(row_start + 4));
 
-                    x_list.push_back(x_pad_mapping[pad]);
-                    y_list.push_back(y_pad_mapping[pad]);
-                    r_list.push_back(r_pad_mapping[pad]);
-                    Q.push_back(adc);
-                    tb.push_back(tb_max);
-                }
+                x_list.push_back(x_pad_mapping[pad]);
+                y_list.push_back(y_pad_mapping[pad]);
+                r_list.push_back(r_pad_mapping[pad]);
+                Q.push_back(adc);
+                tb.push_back(tb_max);
             
             }
             S800TimeStamp = calcS800TS;
