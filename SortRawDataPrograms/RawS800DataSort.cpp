@@ -213,12 +213,24 @@ int main(int argc, char** argv) {
             HeaderData.read(hb.data(), H5::PredType::NATIVE_LLONG);
             ATTPC_TimeStamp = hb[2];
 
+            long long calcS800TS = 0;
             long long offsetted = ATTPC_TimeStamp - 1492;
             long long offsetted1 = ATTPC_TimeStamp - 1493;
-            long long calcS800TS = 0;
+            long long offsetted2 = ATTPC_Timestamp + 281345310;
+            long long offsetted3 = ATTPC_Timestamp + 281345309;
+            long long offsetted4 = ATTPC_Timestamp + 77236264;
+            long long offsetted5 = ATTPC_Timestamp + 77236263;
+            long long offsetted6 = ATTPC_Timestamp + 105566589;
+            long long offsetted7 = ATTPC_Timestamp + 105566588;
             
             if (s800MapData.find(offsetted) != s800MapData.end()) {calcS800TS = offsetted;}
             else if (s800MapData.find(offsetted1) != s800MapData.end()) {calcS800TS = offsetted1;}
+            else if (s800MapData.find(offsetted2) != s800MapData.end()) {calcS800TS = offsetted2;}
+            else if (s800MapData.find(offsetted3) != s800MapData.end()) {calcS800TS = offsetted3;}
+            else if (s800MapData.find(offsetted4) != s800MapData.end()) {calcS800TS = offsetted4;}
+            else if (s800MapData.find(offsetted5) != s800MapData.end()) {calcS800TS = offsetted5;}
+            else if (s800MapData.find(offsetted6) != s800MapData.end()) {calcS800TS = offsetted6;}
+            else if (s800MapData.find(offsetted7) != s800MapData.end()) {calcS800TS = offsetted7;}
 
             if (calcS800TS == 0) {
                 CurrentEvent++;
