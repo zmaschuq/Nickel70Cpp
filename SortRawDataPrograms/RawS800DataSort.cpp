@@ -214,9 +214,11 @@ int main(int argc, char** argv) {
             ATTPC_TimeStamp = hb[2];
 
             long long offsetted = ATTPC_TimeStamp - 1492;
+            long long offsetted1 = ATTPC_TimeStamp - 1493;
             long long calcS800TS = 0;
             
             if (s800MapData.find(offsetted) != s800MapData.end()) {calcS800TS = offsetted;}
+            else if (s800MapData.find(offsetted1) != s800MapData.end()) {calcS800TS = offsetted1;}
 
             if (calcS800TS == 0) {
                 CurrentEvent++;
