@@ -227,12 +227,12 @@ int main(int argc, char** argv) {
             long long calcS800TS = 0;
             long long offsetted = ATTPC_TimeStamp - 1492;
             long long offsetted1 = ATTPC_TimeStamp - 1493;
-            long long offsetted2 = ATTPC_Timestamp + 281345310;
-            long long offsetted3 = ATTPC_Timestamp + 281345309;
-            long long offsetted4 = ATTPC_Timestamp + 77236264;
-            long long offsetted5 = ATTPC_Timestamp + 77236263;
-            long long offsetted6 = ATTPC_Timestamp + 105566589;
-            long long offsetted7 = ATTPC_Timestamp + 105566588;
+            long long offsetted2 = ATTPC_TimeStamp + 281345310;
+            long long offsetted3 = ATTPC_TimeStamp + 281345309;
+            long long offsetted4 = ATTPC_TimeStamp + 77236264;
+            long long offsetted5 = ATTPC_TimeStamp + 77236263;
+            long long offsetted6 = ATTPC_TimeStamp + 105566589;
+            long long offsetted7 = ATTPC_TimeStamp + 105566588;
             
             if (s800MapData.find(offsetted) != s800MapData.end()) {calcS800TS = offsetted;}
             else if (s800MapData.find(offsetted1) != s800MapData.end()) {calcS800TS = offsetted1;}
