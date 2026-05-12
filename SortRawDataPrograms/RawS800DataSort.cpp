@@ -80,6 +80,11 @@ int main(int argc, char** argv) {
     //std::string S800FileName = "run-2139-00.root";
     std::string root_path = "/groups/tahn1/data/70Ni_NSCL/rootS800/cal/" + S800FileName;
     TFile *inputFile = TFile::Open(root_path.c_str(), "READ");
+    if (inputFile->IsZombie()) {
+        cerr << "Root File Does Not Exist!" << endl;
+        exit(1);
+    }
+
     TTree *tree = (TTree*)inputFile->Get("caltree");
 
     Long64_t entries = tree->GetEntries();
@@ -175,6 +180,12 @@ int main(int argc, char** argv) {
 
     //std::string h5filename = "run_0139.h5";
     std::string H5FilePath = "/groups/tahn1/data/70Ni_NSCL/h5/" + h5filename;
+    std::ifstream H5FileCheck(H5FilePath);
+    if (!H5FileCheck) {
+        cerr << "The HDF5 File Does Not Exist!" << endl;
+        return 1;
+    }
+    H5FileCheck.close();
 
     H5::H5File file(H5FilePath.c_str(), H5F_ACC_RDONLY);
     H5::Group EventGroup = file.openGroup("/get");
