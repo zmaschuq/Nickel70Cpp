@@ -229,16 +229,16 @@ int main(int argc, char** argv) {
             for (auto const& [keys, values] : s800MapData) {
                 long long offset = ATTPC_TimeStamp - keys;
 
-                if (offset >= 1490 || offset <= 1494) {
+                if (offset >= 1490 && offset <= 1494) {
                     calcS800TS = keys;
                     break;
-                } else if (offset >= -281345312 || offset <= -281345308) {
+                } else if (offset >= -281345312 && offset <= -281345308) {
                     calcS800TS = keys;
                     break;
-                } else if (offset >= -105566591 || offset <= -105566587) {
+                } else if (offset >= -105566591 && offset <= -105566587) {
                     calcS800TS = keys;
                     break;
-                } else if (offset >= -77236266 || offset <= -77236262) {
+                } else if (offset >= -77236266 && offset <= -77236262) {
                     calcS800TS = keys;
                     break;
                 }
