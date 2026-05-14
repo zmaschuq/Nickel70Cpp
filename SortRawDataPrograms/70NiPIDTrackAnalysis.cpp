@@ -35,7 +35,16 @@ int main(int argc, char** argv) {
         exit(1);
     } 
 
-    TH2D *Beam = new TH2D("Beam", "Beam Profile; Obj Timing;XFP - Obj Timing", 60, -100, -25, 100, 200, 300);
+    TH2F *Beam = new TH2F("Beam", "Beam Profile; Obj Timing;XFP - Obj Timing", 60, -100, -25, 100, 200, 300);
+    TH2F *PID = new TH2F("PIDPlot", "PID Plot;Obj Timing;Energy Loss",60, -100, -25, 1000, 1000, 3000);
+    
+    TCutG *BeamGate = new TCutG("BeamGate", 5);
+    BeamGate->SetPoint(0, -47, 249.25);
+    BeamGate->SetPoint(1, -41, 249.25);
+    BeamGate->SetPoint(2, -41, 252.5);
+    BeamGate->SetPoint(3, -47, 252.5);
+    BeamGate->SetPoint(4, -47, 249.25);
+
 
     vector<float> *ObjVector = nullptr; vector<float> *XFPVector = nullptr;
     float ObjValue; float XFPValue; float dE;
@@ -59,11 +68,16 @@ int main(int argc, char** argv) {
 
         float XFP_Obj = XFPValue - ObjValue;
         Beam->Fill(ObjValue, XFP_Obj);
+        if (BeamGate->IsInside(ObjValue, XFP_Obj)) {PID->Fill(ObjValue, dE);}
 
     }
 
     TCanvas *c1 = new TCanvas();
-    h2->Draw("colz");
+    Beam->Draw("colz");
+    BeamGate->Draw("SAME");
+
+    TCanvas *c2 = new TCanvas();
+    PID->Draw("colz");
 
     app.Run();
     return 0;
