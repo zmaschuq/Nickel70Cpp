@@ -241,6 +241,15 @@ int main(int argc, char** argv) {
                 } else if (offset >= -77236266 && offset <= -77236262) {
                     calcS800TS = keys;
                     break;
+                } else if (offset >= -77313209 && offset <= -77313205) {
+                    calcS800TS = keys;
+                    break;
+                } else if (offset >= -126871313 && offset <= -126871309) {
+                    calcS800TS = keys;
+                    break;
+                } else if (offset >= -11572585 && offset <= -11572581) {
+                    calcS800TS = keys;
+                    break;
                 }
             }
 
